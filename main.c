@@ -113,5 +113,35 @@ void init_terminal(Terminal* terminal, int width, int height) {
   init_screen(&terminal->alt_screen, width, height);
 }
 
+void scroll_screen(Screen* screen, int width, int height) {
+  for (int j = 0; j < height - 1; j++) {
+    for (int k = 0; k < width; k++) {
+      screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
+    }
+  }
+  for (int k = 0; k < width; k++) {
+    screen->lines[height - 1].cells[k].length = 0;
+    screen->lines[height - 1].cells[k].fg = NORMAL;
+    screen->lines[height - 1].cells[k].bg = NONE;
+  }
+}
+
+void scroll_terminal(Terminal* terminal) {
+  if (terminal->using_alt_screen) {
+    scroll_screen(&terminal->alt_screen, terminal->width, terminal->height);
+  } else {
+    scroll_screen(&terminal->screen, terminal->width, terminal->height);
+  }
+}
+
+void handle_newline(Screen *screen, int width, int height) {
+  screen->cursor.x = 0;
+  screen->cursor.y++;
+  if (screen->cursor.y >= height) {
+    screen->cursor.y = height - 1;
+    scroll_screen(screen, width, height);
+  }
+}
+
 int main() {
 }
