@@ -16,9 +16,13 @@ enum Color {
 };
 
 typedef struct Cell {
-  char character;
-  int foreground_color;
-  int background_color;
+  int data[6];
+  int length;
+  int fg;
+  int bg;
+  int bold;
+  int underline;
+  int reverse;
 } Cell;
 
 typedef struct Line {
