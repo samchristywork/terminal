@@ -47,6 +47,24 @@ typedef struct Terminal {
   bool using_alt_screen;
 } Terminal;
 
+typedef enum {
+  TOKEN_TEXT,
+  TOKEN_NEWLINE,
+  TOKEN_CURSOR_MOVE,
+  TOKEN_ALT_SCREEN_ON,
+  TOKEN_ALT_SCREEN_OFF
+} TokenType;
+
+typedef struct {
+  TokenType type;
+  char value[256];
+  int length;
+} Token;
+
+typedef struct {
+  Token* tokens;
+  int count;
+} Tokens;
 
 const char INVERT_COLORS[] = "\x1b[7m";
 const char RESET_COLORS[] = "\x1b[0m";
@@ -141,6 +159,77 @@ void handle_newline(Screen *screen, int width, int height) {
     screen->cursor.y = height - 1;
     scroll_screen(screen, width, height);
   }
+}
+
+Tokens* tokenize(const char* text, int length) {
+  Tokens* tokens = (Tokens*)malloc(sizeof(Tokens));
+  tokens->tokens = (Token*)malloc(128 * sizeof(Token));
+  tokens->count = 0;
+
+  int i = 0;
+  while (i < length) {
+    if (text[i] == '\n') {
+      tokens->tokens[tokens->count].type = TOKEN_NEWLINE;
+      tokens->tokens[tokens->count].length = 0;
+      tokens->count++;
+      i++;
+    } else if (strncmp(&text[i], "\x1b[?1049h", 8) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_ON;
+      tokens->count++;
+      i += 8;
+    } else if (strncmp(&text[i], "\x1b[?1049l", 8) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_OFF;
+      tokens->count++;
+      i += 8;
+    } else if (text[i] == '\x1b' && i + 1 < length && text[i + 1] == '[') {
+      int j = i + 2;
+      char row[4] = {0}, col[4] = {0};
+      int row_idx = 0, col_idx = 0;
+      while (j < length && text[j] >= '0' && text[j] <= '9' && row_idx < 3) {
+        row[row_idx++] = text[j++];
+      }
+      if (j < length && text[j] == ';') {
+        j++;
+        while (j < length && text[j] >= '0' && text[j] <= '9' && col_idx < 3) {
+          col[col_idx++] = text[j++];
+        }
+        if (j < length && text[j] == 'H') {
+          tokens->tokens[tokens->count].type = TOKEN_CURSOR_MOVE;
+          tokens->tokens[tokens->count].length = 2;
+          tokens->tokens[tokens->count].value[0] = atoi(row);
+          tokens->tokens[tokens->count].value[1] = atoi(col);
+          tokens->count++;
+          i = j + 1;
+        } else {
+          // Invalid sequence, treat as text
+          tokens->tokens[tokens->count].type = TOKEN_TEXT;
+          tokens->tokens[tokens->count].value[0] = text[i];
+          tokens->tokens[tokens->count].length = 1;
+          tokens->count++;
+          i++;
+        }
+      } else {
+        // Invalid sequence, treat as text
+        tokens->tokens[tokens->count].type = TOKEN_TEXT;
+        tokens->tokens[tokens->count].value[0] = text[i];
+        tokens->tokens[tokens->count].length = 1;
+        tokens->count++;
+        i++;
+      }
+    } else {
+      // Regular text
+      int start = i;
+      while (i < length && text[i] != '\n' && !(text[i] == '\x1b' && i + 1 < length && text[i + 1] == '[')) {
+        i++;
+      }
+      int text_length = i - start;
+      tokens->tokens[tokens->count].type = TOKEN_TEXT;
+      memcpy(tokens->tokens[tokens->count].value, &text[start], text_length);
+      tokens->tokens[tokens->count].length = text_length;
+      tokens->count++;
+    }
+  }
+  return tokens;
 }
 
 int main() {
