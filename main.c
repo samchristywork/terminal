@@ -34,12 +34,54 @@ typedef struct Cursor {
   int y;
 } Cursor;
 
+typedef struct Screen {
+  Cursor cursor;
+  Line* lines;
+} Screen;
+
 typedef struct Terminal {
   int width;
   int height;
-  Cursor cursor;
-  Line* lines;
+  Screen screen;
+  Screen alt_screen;
+  bool using_alt_screen;
 } Terminal;
+
+
+const char INVERT_COLORS[] = "\x1b[7m";
+const char RESET_COLORS[] = "\x1b[0m";
+
+void print_screen(Screen* screen, int width, int height) {
+  for (int i = 0; i < width + 2; i++) {
+    printf("-");
+  }
+  printf("\n");
+  for (int i = 0; i < height; i++) {
+    printf("|");
+    for (int j = 0; j < width; j++) {
+      Cursor c = screen->cursor;
+      Cell cell = screen->lines[i].cells[j];
+      if (i == c.y && j == c.x) {
+        printf(INVERT_COLORS);
+      }
+      if (cell.length > 0) {
+        for (int k = 0; k < cell.length; k++) {
+          printf("%c", cell.data[k]);
+        }
+      } else {
+        printf(" ");
+      }
+      if (i == c.y && j == c.x) {
+        printf(RESET_COLORS);
+      }
+    }
+    printf("|\n");
+  }
+  for (int i = 0; i < width + 2; i++) {
+    printf("-");
+  }
+  printf("\n");
+}
 
 int main() {
 }
