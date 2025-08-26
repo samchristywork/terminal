@@ -232,5 +232,67 @@ Tokens* tokenize(const char* text, int length) {
   return tokens;
 }
 
+void write_regular_char(Screen* screen, char c, int width, int height) {
+  if (screen->cursor.x >= width) {
+    handle_newline(screen, width, height);
+  }
+
+  if (screen->cursor.y < height) {
+    Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
+    cell->data[0] = c;
+    cell->length = 1;
+    screen->cursor.x++;
+  }
+}
+
+void write_terminal(Terminal* terminal, const char* text, int length) {
+  Tokens *tokens = tokenize(text, length);
+  int width = terminal->width;
+  int height = terminal->height;
+  for (int i = 0; i < tokens->count; i++) {
+    Token token = tokens->tokens[i];
+    if (token.type == TOKEN_TEXT) {
+      for (int j = 0; j < token.length; j++) {
+        if (terminal->using_alt_screen) {
+          write_regular_char(&terminal->alt_screen, token.value[j], width, height);
+        } else {
+          write_regular_char(&terminal->screen, token.value[j], width, height);
+        }
+      }
+    } else if (token.type == TOKEN_ALT_SCREEN_ON) {
+      terminal->using_alt_screen = true;
+    } else if (token.type == TOKEN_ALT_SCREEN_OFF) {
+      terminal->using_alt_screen = false;
+    } else if (token.type == TOKEN_NEWLINE) {
+      if (terminal->using_alt_screen) {
+        handle_newline(&terminal->alt_screen, width, height);
+      } else {
+        handle_newline(&terminal->screen, width, height);
+      }
+    } else if (token.type == TOKEN_CURSOR_MOVE) {
+      int new_x = token.value[0] - 1;
+      int new_y = token.value[1] - 1;
+      if (new_x >= 0 && new_x < width) {
+        if (terminal->using_alt_screen) {
+          terminal->alt_screen.cursor.x = new_x;
+        } else {
+          terminal->screen.cursor.x = new_x;
+        }
+      }
+      if (new_y >= 0 && new_y < height) {
+        if (terminal->using_alt_screen) {
+          terminal->alt_screen.cursor.y = new_y;
+        } else {
+          terminal->screen.cursor.y = new_y;
+        }
+      }
+    }
+  }
+}
+
+void write_string(Terminal* terminal, const char* str) {
+  write_terminal(terminal, str, strlen(str));
+}
+
 int main() {
 }
