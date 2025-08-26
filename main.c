@@ -83,5 +83,35 @@ void print_screen(Screen* screen, int width, int height) {
   printf("\n");
 }
 
+void print_terminal(Terminal* terminal) {
+  if (terminal->using_alt_screen) {
+    print_screen(&terminal->alt_screen, terminal->width, terminal->height);
+  } else {
+    print_screen(&terminal->screen, terminal->width, terminal->height);
+  }
+}
+
+void init_screen(Screen* screen, int width, int height) {
+  screen->cursor.x = 0;
+  screen->cursor.y = 0;
+  screen->lines = (Line*)malloc(height * sizeof(Line));
+  for (int i = 0; i < height; i++) {
+    screen->lines[i].cells = (Cell*)malloc(width * sizeof(Cell));
+    for (int j = 0; j < width; j++) {
+      screen->lines[i].cells[j].length = 0;
+      screen->lines[i].cells[j].fg = NORMAL;
+      screen->lines[i].cells[j].bg = NONE;
+    }
+  }
+}
+
+void init_terminal(Terminal* terminal, int width, int height) {
+  terminal->width = width;
+  terminal->height = height;
+  terminal->using_alt_screen = false;
+  init_screen(&terminal->screen, width, height);
+  init_screen(&terminal->alt_screen, width, height);
+}
+
 int main() {
 }
