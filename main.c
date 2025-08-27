@@ -15,14 +15,18 @@ enum Color {
   NORMAL = 9
 };
 
-typedef struct Cell {
-  int data[6];
-  int length;
-  int fg;
-  int bg;
+typedef struct Attr {
+  int fg; // TODO: Support RGB colors
+  int bg; // TODO: Support RGB colors
   int bold;
   int underline;
   int reverse;
+} Attr;
+
+typedef struct Cell {
+  int data[6];
+  int length;
+  Attr attr;
 } Cell;
 
 typedef struct Line {
@@ -32,6 +36,7 @@ typedef struct Line {
 typedef struct Cursor {
   int x;
   int y;
+  Attr attr;
 } Cursor;
 
 typedef struct Screen {
@@ -117,9 +122,7 @@ void init_screen(Screen* screen, int width, int height) {
   for (int i = 0; i < height; i++) {
     screen->lines[i].cells = (Cell*)malloc(width * sizeof(Cell));
     for (int j = 0; j < width; j++) {
-      screen->lines[i].cells[j].length = 0;
-      screen->lines[i].cells[j].fg = NORMAL;
-      screen->lines[i].cells[j].bg = NONE;
+      bzero(&screen->lines[i].cells[j], sizeof(Cell));
     }
   }
 }
@@ -139,9 +142,7 @@ void scroll_screen(Screen* screen, int width, int height) {
     }
   }
   for (int k = 0; k < width; k++) {
-    screen->lines[height - 1].cells[k].length = 0;
-    screen->lines[height - 1].cells[k].fg = NORMAL;
-    screen->lines[height - 1].cells[k].bg = NONE;
+    bzero(&screen->lines[height - 1].cells[k], sizeof(Cell));
   }
 }
 
@@ -254,6 +255,7 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
   Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
   int height = terminal->height;
+
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
     if (token.type == TOKEN_TEXT) {
