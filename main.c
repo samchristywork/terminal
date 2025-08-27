@@ -59,6 +59,7 @@ typedef enum {
   TOKEN_ALT_SCREEN_ON,
   TOKEN_ALT_SCREEN_OFF,
   TOKEN_HOME,
+  TOKEN_CLEAR_SCREEN,
 } TokenType;
 
 typedef struct {
@@ -175,6 +176,10 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].length = 0;
       tokens->count++;
       i++;
+    } else if (strncmp(&text[i], "\x1b[2J", 4) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_CLEAR_SCREEN;
+      tokens->count++;
+      i += 4;
     } else if (strncmp(&text[i], "\x1b[?1049h", 8) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_ON;
       tokens->count++;
@@ -301,6 +306,24 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
           terminal->screen.cursor.y = new_y;
         }
       }
+    } else if (token.type == TOKEN_CLEAR_SCREEN) {
+      if (terminal->using_alt_screen) {
+        for (int j = 0; j < height; j++) {
+          for (int k = 0; k < width; k++) {
+            bzero(&terminal->alt_screen.lines[j].cells[k], sizeof(Cell));
+          }
+        }
+        terminal->alt_screen.cursor.x = 0;
+        terminal->alt_screen.cursor.y = 0;
+      } else {
+        for (int j = 0; j < height; j++) {
+          for (int k = 0; k < width; k++) {
+            bzero(&terminal->screen.lines[j].cells[k], sizeof(Cell));
+          }
+        }
+        terminal->screen.cursor.x = 0;
+        terminal->screen.cursor.y = 0;
+      }
     }
   }
 }
@@ -339,5 +362,9 @@ int main() {
 
   // Move cursor to home position
   write_string(&terminal, "\x1bHHome");
+  print_terminal(&terminal);
+
+  // Clear screen
+  write_string(&terminal, "\x1b[2J\x1bH");
   print_terminal(&terminal);
 }
