@@ -52,7 +52,8 @@ typedef enum {
   TOKEN_NEWLINE,
   TOKEN_CURSOR_MOVE,
   TOKEN_ALT_SCREEN_ON,
-  TOKEN_ALT_SCREEN_OFF
+  TOKEN_ALT_SCREEN_OFF,
+  TOKEN_HOME,
 } TokenType;
 
 typedef struct {
@@ -181,6 +182,10 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_OFF;
       tokens->count++;
       i += 8;
+    } else if (strncmp(&text[i], "\x1bH", 2) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_HOME;
+      tokens->count++;
+      i += 2;
     } else if (text[i] == '\x1b' && i + 1 < length && text[i + 1] == '[') {
       int j = i + 2;
       char row[4] = {0}, col[4] = {0};
@@ -268,6 +273,14 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
         handle_newline(&terminal->alt_screen, width, height);
       } else {
         handle_newline(&terminal->screen, width, height);
+      }
+    } else if (token.type == TOKEN_HOME) {
+      if (terminal->using_alt_screen) {
+        terminal->alt_screen.cursor.x = 0;
+        terminal->alt_screen.cursor.y = 0;
+      } else {
+        terminal->screen.cursor.x = 0;
+        terminal->screen.cursor.y = 0;
       }
     } else if (token.type == TOKEN_CURSOR_MOVE) {
       int new_x = token.value[0] - 1;
