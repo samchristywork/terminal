@@ -308,4 +308,34 @@ void write_string(Terminal* terminal, const char* str) {
 }
 
 int main() {
+  Terminal terminal;
+  init_terminal(&terminal, 20, 10);
+
+  // Normal text
+  write_string(&terminal, "Hello, World!\n");
+  print_terminal(&terminal);
+
+  // Move cursor and write more text
+  write_string(&terminal, "\x1b[10;5HThis is a test.\n");
+  print_terminal(&terminal);
+
+  // Move cursor again
+  write_string(&terminal, "\x1b[1;2HFoo");
+  print_terminal(&terminal);
+
+  // Scroll
+  write_string(&terminal, "\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\n");
+  print_terminal(&terminal);
+
+  // Alt screen
+  write_string(&terminal, "\x1b[?1049hAlt Screen: Hello, World!");
+  print_terminal(&terminal);
+
+  // Back to normal screen
+  write_string(&terminal, "\x1b[?1049l");
+  print_terminal(&terminal);
+
+  // Move cursor to home position
+  write_string(&terminal, "\x1bHHome");
+  print_terminal(&terminal);
 }
