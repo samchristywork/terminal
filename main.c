@@ -55,6 +55,7 @@ typedef struct Terminal {
 typedef enum {
   TOKEN_TEXT,
   TOKEN_NEWLINE,
+  TOKEN_CARRIAGE_RETURN,
   TOKEN_CURSOR_MOVE,
   TOKEN_ALT_SCREEN_ON,
   TOKEN_ALT_SCREEN_OFF,
@@ -176,6 +177,11 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].length = 0;
       tokens->count++;
       i++;
+    } else if (text[i] == '\r') {
+      tokens->tokens[tokens->count].type = TOKEN_CARRIAGE_RETURN;
+      tokens->tokens[tokens->count].length = 0;
+      tokens->count++;
+      i++;
     } else if (strncmp(&text[i], "\x1b[2J", 4) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_CLEAR_SCREEN;
       tokens->count++;
@@ -281,6 +287,12 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
       } else {
         handle_newline(&terminal->screen, width, height);
       }
+    } else if (token.type == TOKEN_CARRIAGE_RETURN) {
+      if (terminal->using_alt_screen) {
+        terminal->alt_screen.cursor.x = 0;
+      } else {
+        terminal->screen.cursor.x = 0;
+      }
     } else if (token.type == TOKEN_HOME) {
       if (terminal->using_alt_screen) {
         terminal->alt_screen.cursor.x = 0;
@@ -366,5 +378,9 @@ int main() {
 
   // Clear screen
   write_string(&terminal, "\x1b[2J\x1bH");
+  print_terminal(&terminal);
+
+  // Carriage return
+  write_string(&terminal, "Hello,\rWorld!");
   print_terminal(&terminal);
 }
