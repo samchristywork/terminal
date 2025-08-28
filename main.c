@@ -286,7 +286,7 @@ Tokens* tokenize(const char* text, int length) {
     } else {
       // Regular text
       int start = i;
-      while (i < length && text[i] != '\n' && !(text[i] == '\x1b' && i + 1 < length && text[i + 1] == '[')) {
+      while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b') {
         i++;
       }
       int text_length = i - start;
