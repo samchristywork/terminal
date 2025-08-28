@@ -15,7 +15,7 @@ enum Color {
   NORMAL = 9
 };
 
-typedef struct Attr {
+typedef struct {
   int fg; // TODO: Support RGB colors
   int bg; // TODO: Support RGB colors
   int bold;
@@ -23,28 +23,28 @@ typedef struct Attr {
   int reverse;
 } Attr;
 
-typedef struct Cell {
+typedef struct {
   int data[6];
   int length;
   Attr attr;
 } Cell;
 
-typedef struct Line {
+typedef struct {
   Cell* cells;
 } Line;
 
-typedef struct Cursor {
+typedef struct {
   int x;
   int y;
   Attr attr;
 } Cursor;
 
-typedef struct Screen {
+typedef struct {
   Cursor cursor;
   Line* lines;
 } Screen;
 
-typedef struct Terminal {
+typedef struct {
   int width;
   int height;
   Screen screen;
@@ -66,49 +66,49 @@ typedef enum {
 void print_token_type(TokenType type) {
   switch (type) {
     case TOKEN_TEXT:
-      printf("TOKEN_TEXT");
+      printf("%-17s", "TEXT");
       break;
     case TOKEN_NEWLINE:
-      printf("TOKEN_NEWLINE");
+      printf("%-17s", "NEWLINE");
       break;
     case TOKEN_CARRIAGE_RETURN:
-      printf("TOKEN_CARRIAGE_RETURN");
+      printf("%-17s", "CARRIAGE_RETURN");
       break;
     case TOKEN_CURSOR_MOVE:
-      printf("TOKEN_CURSOR_MOVE");
+      printf("%-17s", "CURSOR_MOVE");
       break;
     case TOKEN_ALT_SCREEN_ON:
-      printf("TOKEN_ALT_SCREEN_ON");
+      printf("%-17s", "ALT_SCREEN_ON");
       break;
     case TOKEN_ALT_SCREEN_OFF:
-      printf("TOKEN_ALT_SCREEN_OFF");
+      printf("%-17s", "ALT_SCREEN_OFF");
       break;
     case TOKEN_HOME:
-      printf("TOKEN_HOME");
+      printf("%-17s", "HOME");
       break;
     case TOKEN_CLEAR_SCREEN:
-      printf("TOKEN_CLEAR_SCREEN");
+      printf("%-17s", "CLEAR_SCREEN");
       break;
     case TOKEN_BOLD:
-      printf("TOKEN_BOLD");
+      printf("%-17s", "BOLD");
       break;
     case TOKEN_RESET_BOLD:
-      printf("TOKEN_RESET_BOLD");
+      printf("%-17s", "RESET_BOLD");
       break;
     case TOKEN_UNDERLINE:
-      printf("TOKEN_UNDERLINE");
+      printf("%-17s", "UNDERLINE");
       break;
     case TOKEN_RESET_UNDERLINE:
-      printf("TOKEN_RESET_UNDERLINE");
+      printf("%-17s", "RESET_UNDERLINE");
       break;
     case TOKEN_REVERSE:
-      printf("TOKEN_REVERSE");
+      printf("%-17s", "REVERSE");
       break;
     case TOKEN_RESET_REVERSE:
-      printf("TOKEN_RESET_REVERSE");
+      printf("%-17s", "RESET_REVERSE");
       break;
     default:
-      printf("UNKNOWN_TOKEN");
+      printf("%-17s", "UNKNOWN");
       break;
   }
 }
@@ -320,7 +320,7 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
     print_token_type(token.type);
-    printf(":\ttype=%d, length=%d, value=", token.type, token.length);
+    printf("type=%d, length=%d, value=", token.type, token.length);
     for (int j = 0; j < token.length; j++) {
       printf("%x ", token.value[j]);
     }
