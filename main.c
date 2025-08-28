@@ -63,6 +63,8 @@ typedef enum {
   TOKEN_CLEAR_SCREEN,
   TOKEN_BOLD,
   TOKEN_RESET_BOLD,
+  TOKEN_UNDERLINE,
+  TOKEN_RESET_UNDERLINE,
 } TokenType;
 
 void print_token_type(TokenType type) {
@@ -254,6 +256,14 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].type = TOKEN_RESET_BOLD;
       tokens->count++;
       i += 5;
+    } else if (strncmp(&text[i], "\x1b[4m", 4) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_UNDERLINE;
+      tokens->count++;
+      i += 4;
+    } else if (strncmp(&text[i], "\x1b[24m", 6) == 0) {
+      tokens->tokens[tokens->count].type = TOKEN_RESET_UNDERLINE;
+      tokens->count++;
+      i += 5;
     } else if (strncmp(&text[i], "\x1bH", 2) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_HOME;
       tokens->count++;
@@ -418,6 +428,18 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
       } else {
         terminal->screen.cursor.attr.bold = 0;
       }
+    } else if (token.type == TOKEN_UNDERLINE) {
+      if (terminal->using_alt_screen) {
+        terminal->alt_screen.cursor.attr.underline = 1;
+      } else {
+        terminal->screen.cursor.attr.underline = 1;
+      }
+    } else if (token.type == TOKEN_RESET_UNDERLINE) {
+      if (terminal->using_alt_screen) {
+        terminal->alt_screen.cursor.attr.underline = 0;
+      } else {
+        terminal->screen.cursor.attr.underline = 0;
+      }
     }
   }
 }
@@ -468,5 +490,9 @@ int main() {
 
   // Bold text
   write_string(&terminal, "\x1b[1mBold Text\n\x1b[22mNormal Text");
+  print_terminal(&terminal);
+
+  // Underlined text
+  write_string(&terminal, "\x1b[4mUnderlined Text\n\x1b[24mNormal Text");
   print_terminal(&terminal);
 }
