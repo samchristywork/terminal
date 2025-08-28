@@ -63,6 +63,56 @@ typedef enum {
   TOKEN_CLEAR_SCREEN,
 } TokenType;
 
+void print_token_type(TokenType type) {
+  switch (type) {
+    case TOKEN_TEXT:
+      printf("TOKEN_TEXT");
+      break;
+    case TOKEN_NEWLINE:
+      printf("TOKEN_NEWLINE");
+      break;
+    case TOKEN_CARRIAGE_RETURN:
+      printf("TOKEN_CARRIAGE_RETURN");
+      break;
+    case TOKEN_CURSOR_MOVE:
+      printf("TOKEN_CURSOR_MOVE");
+      break;
+    case TOKEN_ALT_SCREEN_ON:
+      printf("TOKEN_ALT_SCREEN_ON");
+      break;
+    case TOKEN_ALT_SCREEN_OFF:
+      printf("TOKEN_ALT_SCREEN_OFF");
+      break;
+    case TOKEN_HOME:
+      printf("TOKEN_HOME");
+      break;
+    case TOKEN_CLEAR_SCREEN:
+      printf("TOKEN_CLEAR_SCREEN");
+      break;
+    case TOKEN_BOLD:
+      printf("TOKEN_BOLD");
+      break;
+    case TOKEN_RESET_BOLD:
+      printf("TOKEN_RESET_BOLD");
+      break;
+    case TOKEN_UNDERLINE:
+      printf("TOKEN_UNDERLINE");
+      break;
+    case TOKEN_RESET_UNDERLINE:
+      printf("TOKEN_RESET_UNDERLINE");
+      break;
+    case TOKEN_REVERSE:
+      printf("TOKEN_REVERSE");
+      break;
+    case TOKEN_RESET_REVERSE:
+      printf("TOKEN_RESET_REVERSE");
+      break;
+    default:
+      printf("UNKNOWN_TOKEN");
+      break;
+  }
+}
+
 typedef struct {
   TokenType type;
   char value[256];
@@ -269,6 +319,16 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
 
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
+    print_token_type(token.type);
+    printf(":\ttype=%d, length=%d, value=", token.type, token.length);
+    for (int j = 0; j < token.length; j++) {
+      printf("%x ", token.value[j]);
+    }
+    printf("\n");
+  }
+
+  for (int i = 0; i < tokens->count; i++) {
+    Token token = tokens->tokens[i];
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
         if (terminal->using_alt_screen) {
@@ -377,10 +437,10 @@ int main() {
   print_terminal(&terminal);
 
   // Clear screen
-  write_string(&terminal, "\x1b[2J\x1bH");
+  write_string(&terminal, "\x1b[2J\x1bHCleared Screen");
   print_terminal(&terminal);
 
   // Carriage return
-  write_string(&terminal, "Hello,\rWorld!");
+  write_string(&terminal, "\nHello,\rWorld!");
   print_terminal(&terminal);
 }
