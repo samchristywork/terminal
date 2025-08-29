@@ -254,7 +254,7 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].type = TOKEN_BOLD;
       tokens->count++;
       i += 4;
-    } else if (strncmp(&text[i], "\x1b[22m", 6) == 0) {
+    } else if (strncmp(&text[i], "\x1b[22m", 5) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_RESET_BOLD;
       tokens->count++;
       i += 5;
@@ -262,7 +262,7 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].type = TOKEN_UNDERLINE;
       tokens->count++;
       i += 4;
-    } else if (strncmp(&text[i], "\x1b[24m", 6) == 0) {
+    } else if (strncmp(&text[i], "\x1b[24m", 5) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_RESET_UNDERLINE;
       tokens->count++;
       i += 5;
@@ -270,7 +270,7 @@ Tokens* tokenize(const char* text, int length) {
       tokens->tokens[tokens->count].type = TOKEN_REVERSE;
       tokens->count++;
       i += 4;
-    } else if (strncmp(&text[i], "\x1b[27m", 6) == 0) {
+    } else if (strncmp(&text[i], "\x1b[27m", 5) == 0) {
       tokens->tokens[tokens->count].type = TOKEN_RESET_REVERSE;
       tokens->count++;
       i += 5;
@@ -507,18 +507,18 @@ int main() {
   print_terminal(&terminal);
 
   // Carriage return
-  write_string(&terminal, "\nHello,\rWorld!");
+  write_string(&terminal, "\nHello,\rWorld!\n");
   print_terminal(&terminal);
 
   // Bold text
-  write_string(&terminal, "\x1b[1mBold Text\n\x1b[22mNormal Text");
+  write_string(&terminal, "\x1b[1mBold Text\n\x1b[22mNormal Text\n");
   print_terminal(&terminal);
 
   // Underlined text
-  write_string(&terminal, "\x1b[4mUnderlined Text\n\x1b[24mNormal Text");
+  write_string(&terminal, "\x1b[4mUnderlined Text\n\x1b[24mNormal Text\n");
   print_terminal(&terminal);
 
   // Reversed text
-  write_string(&terminal, "\x1b[7mReversed Text\n\x1b[27mNormal Text");
+  write_string(&terminal, "\x1b[7mReversed Text\n\x1b[27mNormal Text\n");
   print_terminal(&terminal);
 }
