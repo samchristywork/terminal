@@ -307,6 +307,60 @@ void modify_cursor(Cursor** cursor, Token token) {
       (*cursor)->attr.bg.is_rgb = 0;
       (*cursor)->attr.bg.color = num;
     }
+  } else if (num_semicolons == 1) {
+    char* token_copy = (char*)malloc((token.length + 1) * sizeof(char));
+    memcpy(token_copy, token.value, token.length);
+    token_copy[token.length] = '\0';
+
+    char* part1 = strtok(token_copy, ";");
+    char* part2 = strtok(NULL, ";");
+
+    int num1 = atoi(part1);
+    int num2 = atoi(part2);
+
+    if (num1 == 0) {
+      (*cursor)->attr.fg.color = 0;
+      (*cursor)->attr.bg.color = 0;
+      (*cursor)->attr.bold = 0;
+      (*cursor)->attr.underline = 0;
+      (*cursor)->attr.reverse = 0;
+    } else {
+      if (num1 == 1) {
+        (*cursor)->attr.bold = 1;
+      } else if (num1 == 4) {
+        (*cursor)->attr.underline = 1;
+      } else if (num1 == 7) {
+        (*cursor)->attr.reverse = 1;
+      } else if (num1 >= 30 && num1 <= 37) {
+        (*cursor)->attr.fg.is_rgb = 0;
+        (*cursor)->attr.fg.color = num1;
+      } else if (num1 >= 40 && num1 <= 47) {
+        (*cursor)->attr.bg.is_rgb = 0;
+        (*cursor)->attr.bg.color = num1;
+      }
+
+      if (num2 == 0) {
+        (*cursor)->attr.fg.color = 0;
+        (*cursor)->attr.bg.color = 0;
+        (*cursor)->attr.bold = 0;
+        (*cursor)->attr.underline = 0;
+        (*cursor)->attr.reverse = 0;
+      } else if (num2 == 1) {
+        (*cursor)->attr.bold = 1;
+      } else if (num2 == 4) {
+        (*cursor)->attr.underline = 1;
+      } else if (num2 == 7) {
+        (*cursor)->attr.reverse = 1;
+      } else if (num2 >= 30 && num2 <= 37) {
+        (*cursor)->attr.fg.is_rgb = 0;
+        (*cursor)->attr.fg.color = num2;
+      } else if (num2 >= 40 && num2 <= 47) {
+        (*cursor)->attr.bg.is_rgb = 0;
+        (*cursor)->attr.bg.color = num2;
+      }
+    }
+
+    free(token_copy);
   }
 }
 
