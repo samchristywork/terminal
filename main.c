@@ -16,6 +16,20 @@ enum Color {
 };
 
 typedef struct {
+  int red;
+  int green;
+  int blue;
+} RGB;
+
+typedef struct {
+  int is_rgb;
+  union {
+    int color;
+    RGB rgb;
+  };
+} Color;
+
+typedef struct {
   int fg; // TODO: Support RGB colors
   int bg; // TODO: Support RGB colors
   int bold;
