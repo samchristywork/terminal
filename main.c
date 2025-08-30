@@ -209,6 +209,14 @@ void add_token(Tokens* tokens, TokenType type, const char* value, int length) {
   tokens->count++;
 }
 
+bool is_color_code(const char* text, int length, int* index) {
+  if (text[*index] == '\x1b' && *index + 1 < length && text[*index + 1] == '[') {
+    *index += 2;
+    return true;
+  }
+  return false;
+}
+
 Tokens *tokenize(const char* text, int length) {
   Tokens* tokens = (Tokens*)malloc(sizeof(Tokens));
   tokens->tokens = (Token*)malloc(128 * sizeof(Token));
@@ -219,6 +227,16 @@ Tokens *tokenize(const char* text, int length) {
       add_token(tokens, TOKEN_NEWLINE, NULL, 0);
     }else if (matches(text, length, &i, "\r")) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
+    }else if (is_color_code(text, length, &i)) {
+      int start = i;
+      while (i < length && text[i] != 'm') {
+        i++;
+      }
+      if (i < length) {
+        i++;
+      }
+      add_token(tokens, TOKEN_GRAPHICS, &text[start], i - start);
+      i--;
     } else {
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b') {
@@ -304,4 +322,5 @@ int main() {
 
   test(&t, "Normal text", "Hello, World!\n");
   test(&t, "Carriage return", "Hello,\rWorld!\n");
+  test(&t, "Red text", "\x1b[31mThis is red text\n");
 }
