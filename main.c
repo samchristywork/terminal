@@ -99,6 +99,21 @@ void print_cursor_data(Cursor cursor) {
 }
 
 void print_cell_color(Attr attr) {
+  printf("\x1b[0m");
+  if (attr.bold) {
+    printf("\x1b[1m");
+  }
+  if (attr.underline) {
+    printf("\x1b[4m");
+  }
+  if (attr.reverse) {
+    printf("\x1b[7m");
+  }
+  if (attr.fg.is_rgb) {
+    printf("\x1b[38;2;%d;%d;%dm", attr.fg.rgb.red, attr.fg.rgb.green, attr.fg.rgb.blue);
+  } else {
+    printf("\x1b[3%dm", attr.fg.color);
+  }
 }
 
 void print_screen(Screen* screen, int width, int height) {
@@ -264,6 +279,38 @@ void write_regular_char(Screen* screen, char c, int width, int height, Attr attr
   }
 }
 
+void modify_cursor(Cursor** cursor, Token token) {
+  int num_semicolons = 0;
+  for (int i = 0; i < token.length; i++) {
+    if (token.value[i] == ';') {
+      num_semicolons++;
+    }
+  }
+
+  if (num_semicolons == 0) {
+    int num = atoi(token.value);
+    if (num == 0) {
+      (*cursor)->attr.fg.color = 7; // Default foreground
+      (*cursor)->attr.bg.color = 0; // Default background
+      (*cursor)->attr.bold = 0;
+      (*cursor)->attr.underline = 0;
+      (*cursor)->attr.reverse = 0;
+    } else if (num == 1) {
+      (*cursor)->attr.bold = 1;
+    } else if (num == 4) {
+      (*cursor)->attr.underline = 1;
+    } else if (num == 7) {
+      (*cursor)->attr.reverse = 1;
+    } else if (num >= 30 && num <= 37) {
+      (*cursor)->attr.fg.is_rgb = 0;
+      (*cursor)->attr.fg.color = num - 30;
+    } else if (num >= 40 && num <= 47) {
+      (*cursor)->attr.bg.is_rgb = 0;
+      (*cursor)->attr.bg.color = num - 40;
+    }
+  }
+}
+
 void write_terminal(Terminal* terminal, const char* text, int length) {
   Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
@@ -301,6 +348,9 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
       } else {
         terminal->screen.cursor.x = 0;
       }
+    } else if (token.type == TOKEN_GRAPHICS) {
+      Cursor* cursor = terminal->using_alt_screen ? &terminal->alt_screen.cursor : &terminal->screen.cursor;
+      modify_cursor(&cursor, token);
     }
   }
 }
