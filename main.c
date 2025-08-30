@@ -100,20 +100,19 @@ void print_cursor_data(Cursor cursor) {
 
 void print_cell_color(Attr attr) {
   printf("\x1b[0m");
-  if (attr.bold) {
-    printf("\x1b[1m");
-  }
-  if (attr.underline) {
-    printf("\x1b[4m");
-  }
-  if (attr.reverse) {
-    printf("\x1b[7m");
-  }
-  if (attr.fg.is_rgb) {
-    printf("\x1b[38;2;%d;%d;%dm", attr.fg.rgb.red, attr.fg.rgb.green, attr.fg.rgb.blue);
-  } else {
-    printf("\x1b[3%dm", attr.fg.color);
-  }
+
+  int style = 0;
+  if (attr.bold) style = 1;
+  if (attr.underline) style = 4;
+  if (attr.reverse) style = 7;
+
+  int fg = attr.fg.color;
+  int bg = attr.bg.color;
+
+  if (fg == 0) fg = 39;
+  if (bg == 0) bg = 49;
+
+  printf("\x1b[%d;%d;%dm", style, fg, bg);
 }
 
 void print_screen(Screen* screen, int width, int height) {
@@ -290,8 +289,8 @@ void modify_cursor(Cursor** cursor, Token token) {
   if (num_semicolons == 0) {
     int num = atoi(token.value);
     if (num == 0) {
-      (*cursor)->attr.fg.color = 7; // Default foreground
-      (*cursor)->attr.bg.color = 0; // Default background
+      (*cursor)->attr.fg.color = 0;
+      (*cursor)->attr.bg.color = 0;
       (*cursor)->attr.bold = 0;
       (*cursor)->attr.underline = 0;
       (*cursor)->attr.reverse = 0;
@@ -303,10 +302,10 @@ void modify_cursor(Cursor** cursor, Token token) {
       (*cursor)->attr.reverse = 1;
     } else if (num >= 30 && num <= 37) {
       (*cursor)->attr.fg.is_rgb = 0;
-      (*cursor)->attr.fg.color = num - 30;
+      (*cursor)->attr.fg.color = num;
     } else if (num >= 40 && num <= 47) {
       (*cursor)->attr.bg.is_rgb = 0;
-      (*cursor)->attr.bg.color = num - 40;
+      (*cursor)->attr.bg.color = num;
     }
   }
 }
