@@ -2,19 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum Color {
-  NONE = -1,
-  BLACK = 0,
-  RED = 1,
-  GREEN = 2,
-  YELLOW = 3,
-  BLUE = 4,
-  MAGENTA = 5,
-  CYAN = 6,
-  WHITE = 7,
-  NORMAL = 9
-};
-
 typedef struct {
   int red;
   int green;
@@ -125,19 +112,18 @@ void print_screen(Screen* screen, int width, int height) {
     for (int j = 0; j < width; j++) {
       Cursor c = screen->cursor;
       Cell cell = screen->lines[i].cells[j];
+      print_cell_color(cell.attr);
       if (i == c.y && j == c.x) {
-        printf(INVERT_COLORS);
+        printf(INVERT_COLORS); // TODO: This is incorrect if cell is already reverse
       }
       if (cell.length > 0) {
-        for (int k = 0; k < cell.length; k++) {
-          printf("%c", cell.data[k]);
-        }
+        printf("%c", cell.data[0]);
+        //printf("%x ", cell.data[0]);
+        //printf("x");
       } else {
         printf(" ");
       }
-      if (i == c.y && j == c.x) {
-        printf(RESET_COLORS);
-      }
+      printf(RESET_COLORS);
     }
     printf("|\n");
   }
@@ -305,7 +291,17 @@ void write_string(Terminal* terminal, const char* str) {
   write_terminal(terminal, str, strlen(str));
 }
 
+void test(Terminal* terminal, const char* test_name, const char* input) {
+  printf("=== %s ===\n", test_name);
+  write_string(terminal, input);
+  print_terminal(terminal);
+  printf("\n");
+}
 
 int main() {
+  Terminal t;
+  init_terminal(&t, 20, 10);
 
+  test(&t, "Normal text", "Hello, World!\n");
+  test(&t, "Carriage return", "Hello,\rWorld!\n");
 }
