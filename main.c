@@ -30,8 +30,8 @@ typedef struct {
 } Color;
 
 typedef struct {
-  int fg; // TODO: Support RGB colors
-  int bg; // TODO: Support RGB colors
+  Color fg;
+  Color bg;
   int bold;
   int underline;
   int reverse;
@@ -147,7 +147,18 @@ typedef struct {
 const char INVERT_COLORS[] = "\x1b[7m";
 const char RESET_COLORS[] = "\x1b[0m";
 
+void print_cursor_data(Cursor cursor) {
+  printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, reverse=%d}\n",
+         cursor.x, cursor.y,
+         cursor.attr.fg, cursor.attr.bg,
+         cursor.attr.bold, cursor.attr.underline, cursor.attr.reverse);
+}
+
+void print_cell_color(Attr attr) {
+}
+
 void print_screen(Screen* screen, int width, int height) {
+  print_cursor_data(screen->cursor);
   for (int i = 0; i < width + 2; i++) {
     printf("-");
   }
