@@ -392,5 +392,12 @@ int main() {
 
   test(&t, "Normal text", "Hello, World!\n");
   test(&t, "Carriage return", "Hello,\rWorld!\n");
-  test(&t, "Red text", "\x1b[31mThis is red text\n");
+  test(&t, "Red text", "\x1b[31mThis is red text\x1b[0m\n");
+  test(&t, "Red and blue text", "\x1b[31mRed \x1b[34mBlue\x1b[0m Normal\n");
+  test(&t, "Bold", "\x1b[1mThis is bold text\x1b[0m\n");
+  test(&t, "Bold and underline", "\x1b[1mBold \x1b[4mUnderline\x1b[0m\n");
+  test(&t, "Reverse", "\x1b[7mReverse text\x1b[0m\n");
+  test(&t, "Red background", "\x1b[41mRed background\x1b[0m\n");
+  test(&t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
+  test(&t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
 }
