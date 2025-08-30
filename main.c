@@ -116,7 +116,9 @@ void print_cell_color(Attr attr) {
 }
 
 void print_screen(Screen* screen, int width, int height) {
+#ifdef DEBUG
   print_cursor_data(screen->cursor);
+#endif
   for (int i = 0; i < width + 2; i++) {
     printf("-");
   }
@@ -278,6 +280,28 @@ void write_regular_char(Screen* screen, char c, int width, int height, Attr attr
   }
 }
 
+void handle_field(Cursor** cursor, int value) {
+  if (value == 0) {
+    (*cursor)->attr.fg.color = 0;
+    (*cursor)->attr.bg.color = 0;
+    (*cursor)->attr.bold = 0;
+    (*cursor)->attr.underline = 0;
+    (*cursor)->attr.reverse = 0;
+  } else if (value == 1) {
+    (*cursor)->attr.bold = 1;
+  } else if (value == 4) {
+    (*cursor)->attr.underline = 1;
+  } else if (value == 7) {
+    (*cursor)->attr.reverse = 1;
+  } else if (value >= 30 && value <= 37) {
+    (*cursor)->attr.fg.is_rgb = 0;
+    (*cursor)->attr.fg.color = value;
+  } else if (value >= 40 && value <= 47) {
+    (*cursor)->attr.bg.is_rgb = 0;
+    (*cursor)->attr.bg.color = value;
+  }
+}
+
 void modify_cursor(Cursor** cursor, Token token) {
   int num_semicolons = 0;
   for (int i = 0; i < token.length; i++) {
@@ -286,78 +310,19 @@ void modify_cursor(Cursor** cursor, Token token) {
     }
   }
 
-  if (num_semicolons == 0) {
-    int num = atoi(token.value);
-    if (num == 0) {
-      (*cursor)->attr.fg.color = 0;
-      (*cursor)->attr.bg.color = 0;
-      (*cursor)->attr.bold = 0;
-      (*cursor)->attr.underline = 0;
-      (*cursor)->attr.reverse = 0;
-    } else if (num == 1) {
-      (*cursor)->attr.bold = 1;
-    } else if (num == 4) {
-      (*cursor)->attr.underline = 1;
-    } else if (num == 7) {
-      (*cursor)->attr.reverse = 1;
-    } else if (num >= 30 && num <= 37) {
-      (*cursor)->attr.fg.is_rgb = 0;
-      (*cursor)->attr.fg.color = num;
-    } else if (num >= 40 && num <= 47) {
-      (*cursor)->attr.bg.is_rgb = 0;
-      (*cursor)->attr.bg.color = num;
-    }
-  } else if (num_semicolons == 1) {
+  for (int i = 0; i <= num_semicolons; i++) {
     char* token_copy = (char*)malloc((token.length + 1) * sizeof(char));
     memcpy(token_copy, token.value, token.length);
     token_copy[token.length] = '\0';
 
-    char* part1 = strtok(token_copy, ";");
-    char* part2 = strtok(NULL, ";");
+    char* part = strtok(token_copy, ";");
+    for (int j = 0; j < i; j++) {
+      part = strtok(NULL, ";");
+    }
 
-    int num1 = atoi(part1);
-    int num2 = atoi(part2);
-
-    if (num1 == 0) {
-      (*cursor)->attr.fg.color = 0;
-      (*cursor)->attr.bg.color = 0;
-      (*cursor)->attr.bold = 0;
-      (*cursor)->attr.underline = 0;
-      (*cursor)->attr.reverse = 0;
-    } else {
-      if (num1 == 1) {
-        (*cursor)->attr.bold = 1;
-      } else if (num1 == 4) {
-        (*cursor)->attr.underline = 1;
-      } else if (num1 == 7) {
-        (*cursor)->attr.reverse = 1;
-      } else if (num1 >= 30 && num1 <= 37) {
-        (*cursor)->attr.fg.is_rgb = 0;
-        (*cursor)->attr.fg.color = num1;
-      } else if (num1 >= 40 && num1 <= 47) {
-        (*cursor)->attr.bg.is_rgb = 0;
-        (*cursor)->attr.bg.color = num1;
-      }
-
-      if (num2 == 0) {
-        (*cursor)->attr.fg.color = 0;
-        (*cursor)->attr.bg.color = 0;
-        (*cursor)->attr.bold = 0;
-        (*cursor)->attr.underline = 0;
-        (*cursor)->attr.reverse = 0;
-      } else if (num2 == 1) {
-        (*cursor)->attr.bold = 1;
-      } else if (num2 == 4) {
-        (*cursor)->attr.underline = 1;
-      } else if (num2 == 7) {
-        (*cursor)->attr.reverse = 1;
-      } else if (num2 >= 30 && num2 <= 37) {
-        (*cursor)->attr.fg.is_rgb = 0;
-        (*cursor)->attr.fg.color = num2;
-      } else if (num2 >= 40 && num2 <= 47) {
-        (*cursor)->attr.bg.is_rgb = 0;
-        (*cursor)->attr.bg.color = num2;
-      }
+    if (part != NULL) {
+      int num = atoi(part);
+      handle_field(cursor, num);
     }
 
     free(token_copy);
@@ -369,6 +334,7 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
   int width = terminal->width;
   int height = terminal->height;
 
+#ifdef DEBUG
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
     print_token_type(token.type);
@@ -378,6 +344,7 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
     }
     printf("\n");
   }
+#endif
 
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
