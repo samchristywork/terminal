@@ -8,8 +8,14 @@ typedef struct {
   int blue;
 } RGB;
 
+typedef enum {
+  COLOR_DEFAULT,
+  COLOR_256,
+  COLOR_RGB,
+} ColorType;
+
 typedef struct {
-  int is_rgb;
+  ColorType type;
   union {
     int color;
     RGB rgb;
@@ -99,20 +105,21 @@ void print_cursor_data(Cursor cursor) {
 }
 
 void print_cell_color(Attr attr) {
-  printf("\x1b[0m");
-
-  int style = 0;
-  if (attr.bold) style = 1;
-  if (attr.underline) style = 4;
-  if (attr.reverse) style = 7;
-
-  int fg = attr.fg.color;
-  int bg = attr.bg.color;
-
-  if (fg == 0) fg = 39;
-  if (bg == 0) bg = 49;
-
-  printf("\x1b[%d;%d;%dm", style, fg, bg);
+  if (attr.fg.color !=0) {
+    printf("\x1b[%dm", attr.fg.color);
+  }
+  if (attr.bg.color !=0) {
+    printf("\x1b[%dm", attr.bg.color);
+  }
+  if (attr.bold) {
+    printf("\x1b[1m");
+  }
+  if (attr.underline) {
+    printf("\x1b[4m");
+  }
+  if (attr.reverse) {
+    printf("\x1b[7m");
+  }
 }
 
 void print_screen(Screen* screen, int width, int height) {
@@ -294,10 +301,10 @@ void handle_field(Cursor** cursor, int value) {
   } else if (value == 7) {
     (*cursor)->attr.reverse = 1;
   } else if (value >= 30 && value <= 37) {
-    (*cursor)->attr.fg.is_rgb = 0;
+    (*cursor)->attr.fg.type = COLOR_DEFAULT;
     (*cursor)->attr.fg.color = value;
   } else if (value >= 40 && value <= 47) {
-    (*cursor)->attr.bg.is_rgb = 0;
+    (*cursor)->attr.bg.type = COLOR_DEFAULT;
     (*cursor)->attr.bg.color = value;
   }
 }
@@ -388,15 +395,15 @@ void test(Terminal* terminal, const char* test_name, const char* input) {
 
 int main() {
   Terminal t;
-  init_terminal(&t, 20, 10);
+  init_terminal(&t, 30, 10);
 
   test(&t, "Normal text", "Hello, World!\n");
   test(&t, "Carriage return", "Hello,\rWorld!\n");
   test(&t, "Red text", "\x1b[31mThis is red text\x1b[0m\n");
   test(&t, "Red and blue text", "\x1b[31mRed \x1b[34mBlue\x1b[0m Normal\n");
   test(&t, "Bold", "\x1b[1mThis is bold text\x1b[0m\n");
-  test(&t, "Bold and underline", "\x1b[1mBold \x1b[4mUnderline\x1b[0m\n");
   test(&t, "Reverse", "\x1b[7mReverse text\x1b[0m\n");
+  test(&t, "Bold, underline, reverse", "\x1b[1mBold \x1b[0m\x1b[4mUnderline\x1b[0m \x1b[7mReverse\x1b[0m\n");
   test(&t, "Red background", "\x1b[41mRed background\x1b[0m\n");
   test(&t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
   test(&t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
