@@ -70,17 +70,7 @@ typedef enum {
   TOKEN_TEXT,
   TOKEN_NEWLINE,
   TOKEN_CARRIAGE_RETURN,
-  TOKEN_CURSOR_MOVE,
-  TOKEN_ALT_SCREEN_ON,
-  TOKEN_ALT_SCREEN_OFF,
-  TOKEN_HOME,
-  TOKEN_CLEAR_SCREEN,
-  TOKEN_BOLD,
-  TOKEN_RESET_BOLD,
-  TOKEN_UNDERLINE,
-  TOKEN_RESET_UNDERLINE,
-  TOKEN_REVERSE,
-  TOKEN_RESET_REVERSE,
+  TOKEN_GRAPHICS,
 } TokenType;
 
 void print_token_type(TokenType type) {
@@ -94,41 +84,8 @@ void print_token_type(TokenType type) {
     case TOKEN_CARRIAGE_RETURN:
       printf("%-17s", "CARRIAGE_RETURN");
       break;
-    case TOKEN_CURSOR_MOVE:
-      printf("%-17s", "CURSOR_MOVE");
-      break;
-    case TOKEN_ALT_SCREEN_ON:
-      printf("%-17s", "ALT_SCREEN_ON");
-      break;
-    case TOKEN_ALT_SCREEN_OFF:
-      printf("%-17s", "ALT_SCREEN_OFF");
-      break;
-    case TOKEN_HOME:
-      printf("%-17s", "HOME");
-      break;
-    case TOKEN_CLEAR_SCREEN:
-      printf("%-17s", "CLEAR_SCREEN");
-      break;
-    case TOKEN_BOLD:
-      printf("%-17s", "BOLD");
-      break;
-    case TOKEN_RESET_BOLD:
-      printf("%-17s", "RESET_BOLD");
-      break;
-    case TOKEN_UNDERLINE:
-      printf("%-17s", "UNDERLINE");
-      break;
-    case TOKEN_RESET_UNDERLINE:
-      printf("%-17s", "RESET_UNDERLINE");
-      break;
-    case TOKEN_REVERSE:
-      printf("%-17s", "REVERSE");
-      break;
-    case TOKEN_RESET_REVERSE:
-      printf("%-17s", "RESET_REVERSE");
-      break;
-    default:
-      printf("%-17s", "UNKNOWN");
+    case TOKEN_GRAPHICS:
+      printf("%-17s", "GRAPHICS");
       break;
   }
 }
@@ -150,7 +107,7 @@ const char RESET_COLORS[] = "\x1b[0m";
 void print_cursor_data(Cursor cursor) {
   printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, reverse=%d}\n",
          cursor.x, cursor.y,
-         cursor.attr.fg, cursor.attr.bg,
+         cursor.attr.fg.color, cursor.attr.bg.color,
          cursor.attr.bold, cursor.attr.underline, cursor.attr.reverse);
 }
 
@@ -245,115 +202,51 @@ void handle_newline(Screen *screen, int width, int height) {
   }
 }
 
-Tokens* tokenize(const char* text, int length) {
+bool matches(const char* text, int length, int* index, const char* seq) {
+  int seq_len = strlen(seq);
+  if (*index + seq_len > length) {
+    return false;
+  }
+  if (strncmp(&text[*index], seq, seq_len) == 0) {
+    *index += seq_len - 1;
+    return true;
+  }
+  return false;
+}
+
+void add_token(Tokens* tokens, TokenType type, const char* value, int length) {
+  tokens->tokens[tokens->count].type = type;
+  if (value != NULL && length > 0) {
+    memcpy(tokens->tokens[tokens->count].value, value, length);
+  }
+  tokens->tokens[tokens->count].length = length;
+  tokens->count++;
+}
+
+Tokens *tokenize(const char* text, int length) {
   Tokens* tokens = (Tokens*)malloc(sizeof(Tokens));
   tokens->tokens = (Token*)malloc(128 * sizeof(Token));
   tokens->count = 0;
 
-  int i = 0;
-  while (i < length) {
-    if (text[i] == '\n') {
-      tokens->tokens[tokens->count].type = TOKEN_NEWLINE;
-      tokens->tokens[tokens->count].length = 0;
-      tokens->count++;
-      i++;
-    } else if (text[i] == '\r') {
-      tokens->tokens[tokens->count].type = TOKEN_CARRIAGE_RETURN;
-      tokens->tokens[tokens->count].length = 0;
-      tokens->count++;
-      i++;
-    } else if (strncmp(&text[i], "\x1b[2J", 4) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_CLEAR_SCREEN;
-      tokens->count++;
-      i += 4;
-    } else if (strncmp(&text[i], "\x1b[?1049h", 8) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_ON;
-      tokens->count++;
-      i += 8;
-    } else if (strncmp(&text[i], "\x1b[?1049l", 8) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_ALT_SCREEN_OFF;
-      tokens->count++;
-      i += 8;
-    } else if (strncmp(&text[i], "\x1b[1m", 4) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_BOLD;
-      tokens->count++;
-      i += 4;
-    } else if (strncmp(&text[i], "\x1b[22m", 5) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_RESET_BOLD;
-      tokens->count++;
-      i += 5;
-    } else if (strncmp(&text[i], "\x1b[4m", 4) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_UNDERLINE;
-      tokens->count++;
-      i += 4;
-    } else if (strncmp(&text[i], "\x1b[24m", 5) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_RESET_UNDERLINE;
-      tokens->count++;
-      i += 5;
-    } else if (strncmp(&text[i], "\x1b[7m", 4) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_REVERSE;
-      tokens->count++;
-      i += 4;
-    } else if (strncmp(&text[i], "\x1b[27m", 5) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_RESET_REVERSE;
-      tokens->count++;
-      i += 5;
-    } else if (strncmp(&text[i], "\x1bH", 2) == 0) {
-      tokens->tokens[tokens->count].type = TOKEN_HOME;
-      tokens->count++;
-      i += 2;
-    } else if (text[i] == '\x1b' && i + 1 < length && text[i + 1] == '[') {
-      int j = i + 2;
-      char row[4] = {0}, col[4] = {0};
-      int row_idx = 0, col_idx = 0;
-      while (j < length && text[j] >= '0' && text[j] <= '9' && row_idx < 3) {
-        row[row_idx++] = text[j++];
-      }
-      if (j < length && text[j] == ';') {
-        j++;
-        while (j < length && text[j] >= '0' && text[j] <= '9' && col_idx < 3) {
-          col[col_idx++] = text[j++];
-        }
-        if (j < length && text[j] == 'H') {
-          tokens->tokens[tokens->count].type = TOKEN_CURSOR_MOVE;
-          tokens->tokens[tokens->count].length = 2;
-          tokens->tokens[tokens->count].value[0] = atoi(row);
-          tokens->tokens[tokens->count].value[1] = atoi(col);
-          tokens->count++;
-          i = j + 1;
-        } else {
-          // Invalid sequence, treat as text
-          tokens->tokens[tokens->count].type = TOKEN_TEXT;
-          tokens->tokens[tokens->count].value[0] = text[i];
-          tokens->tokens[tokens->count].length = 1;
-          tokens->count++;
-          i++;
-        }
-      } else {
-        // Invalid sequence, treat as text
-        tokens->tokens[tokens->count].type = TOKEN_TEXT;
-        tokens->tokens[tokens->count].value[0] = text[i];
-        tokens->tokens[tokens->count].length = 1;
-        tokens->count++;
-        i++;
-      }
+  for (int i = 0; i < length; i++) {
+    if (matches(text, length, &i, "\n")) {
+      add_token(tokens, TOKEN_NEWLINE, NULL, 0);
+    }else if (matches(text, length, &i, "\r")) {
+      add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
     } else {
-      // Regular text
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b') {
         i++;
       }
-      int text_length = i - start;
-      tokens->tokens[tokens->count].type = TOKEN_TEXT;
-      memcpy(tokens->tokens[tokens->count].value, &text[start], text_length);
-      tokens->tokens[tokens->count].length = text_length;
-      tokens->count++;
+      add_token(tokens, TOKEN_TEXT, &text[start], i - start);
+      i--;
     }
   }
+
   return tokens;
 }
 
-void write_regular_char(Screen* screen, char c, int width, int height) {
+void write_regular_char(Screen* screen, char c, int width, int height, Attr attr) {
   if (screen->cursor.x >= width) {
     handle_newline(screen, width, height);
   }
@@ -362,6 +255,7 @@ void write_regular_char(Screen* screen, char c, int width, int height) {
     Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
     cell->data[0] = c;
     cell->length = 1;
+    cell->attr = attr;
     screen->cursor.x++;
   }
 }
@@ -374,7 +268,7 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
     print_token_type(token.type);
-    printf("type=%d, length=%d, value=", token.type, token.length);
+    printf("len=%d, val=", token.length);
     for (int j = 0; j < token.length; j++) {
       printf("%x ", token.value[j]);
     }
@@ -386,15 +280,11 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
         if (terminal->using_alt_screen) {
-          write_regular_char(&terminal->alt_screen, token.value[j], width, height);
+          write_regular_char(&terminal->alt_screen, token.value[j], width, height, terminal->alt_screen.cursor.attr);
         } else {
-          write_regular_char(&terminal->screen, token.value[j], width, height);
+          write_regular_char(&terminal->screen, token.value[j], width, height, terminal->screen.cursor.attr);
         }
       }
-    } else if (token.type == TOKEN_ALT_SCREEN_ON) {
-      terminal->using_alt_screen = true;
-    } else if (token.type == TOKEN_ALT_SCREEN_OFF) {
-      terminal->using_alt_screen = false;
     } else if (token.type == TOKEN_NEWLINE) {
       if (terminal->using_alt_screen) {
         handle_newline(&terminal->alt_screen, width, height);
@@ -407,85 +297,6 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
       } else {
         terminal->screen.cursor.x = 0;
       }
-    } else if (token.type == TOKEN_HOME) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.x = 0;
-        terminal->alt_screen.cursor.y = 0;
-      } else {
-        terminal->screen.cursor.x = 0;
-        terminal->screen.cursor.y = 0;
-      }
-    } else if (token.type == TOKEN_CURSOR_MOVE) {
-      int new_x = token.value[0] - 1;
-      int new_y = token.value[1] - 1;
-      if (new_x >= 0 && new_x < width) {
-        if (terminal->using_alt_screen) {
-          terminal->alt_screen.cursor.x = new_x;
-        } else {
-          terminal->screen.cursor.x = new_x;
-        }
-      }
-      if (new_y >= 0 && new_y < height) {
-        if (terminal->using_alt_screen) {
-          terminal->alt_screen.cursor.y = new_y;
-        } else {
-          terminal->screen.cursor.y = new_y;
-        }
-      }
-    } else if (token.type == TOKEN_CLEAR_SCREEN) {
-      if (terminal->using_alt_screen) {
-        for (int j = 0; j < height; j++) {
-          for (int k = 0; k < width; k++) {
-            bzero(&terminal->alt_screen.lines[j].cells[k], sizeof(Cell));
-          }
-        }
-        terminal->alt_screen.cursor.x = 0;
-        terminal->alt_screen.cursor.y = 0;
-      } else {
-        for (int j = 0; j < height; j++) {
-          for (int k = 0; k < width; k++) {
-            bzero(&terminal->screen.lines[j].cells[k], sizeof(Cell));
-          }
-        }
-        terminal->screen.cursor.x = 0;
-        terminal->screen.cursor.y = 0;
-      }
-    } else if (token.type == TOKEN_BOLD) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.bold = 1;
-      } else {
-        terminal->screen.cursor.attr.bold = 1;
-      }
-    } else if (token.type == TOKEN_RESET_BOLD) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.bold = 0;
-      } else {
-        terminal->screen.cursor.attr.bold = 0;
-      }
-    } else if (token.type == TOKEN_UNDERLINE) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.underline = 1;
-      } else {
-        terminal->screen.cursor.attr.underline = 1;
-      }
-    } else if (token.type == TOKEN_RESET_UNDERLINE) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.underline = 0;
-      } else {
-        terminal->screen.cursor.attr.underline = 0;
-      }
-    } else if (token.type == TOKEN_REVERSE) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.reverse = 1;
-      } else {
-        terminal->screen.cursor.attr.reverse = 1;
-      }
-    } else if (token.type == TOKEN_RESET_REVERSE) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.attr.reverse = 0;
-      } else {
-        terminal->screen.cursor.attr.reverse = 0;
-      }
     }
   }
 }
@@ -494,55 +305,7 @@ void write_string(Terminal* terminal, const char* str) {
   write_terminal(terminal, str, strlen(str));
 }
 
+
 int main() {
-  Terminal terminal;
-  init_terminal(&terminal, 20, 10);
 
-  // Normal text
-  write_string(&terminal, "Hello, World!\n");
-  print_terminal(&terminal);
-
-  // Move cursor and write more text
-  write_string(&terminal, "\x1b[10;5HThis is a test.\n");
-  print_terminal(&terminal);
-
-  // Move cursor again
-  write_string(&terminal, "\x1b[1;2HFoo");
-  print_terminal(&terminal);
-
-  // Scroll
-  write_string(&terminal, "\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\n");
-  print_terminal(&terminal);
-
-  // Alt screen
-  write_string(&terminal, "\x1b[?1049hAlt Screen: Hello, World!");
-  print_terminal(&terminal);
-
-  // Back to normal screen
-  write_string(&terminal, "\x1b[?1049l");
-  print_terminal(&terminal);
-
-  // Move cursor to home position
-  write_string(&terminal, "\x1bHHome");
-  print_terminal(&terminal);
-
-  // Clear screen
-  write_string(&terminal, "\x1b[2J\x1bHCleared Screen");
-  print_terminal(&terminal);
-
-  // Carriage return
-  write_string(&terminal, "\nHello,\rWorld!\n");
-  print_terminal(&terminal);
-
-  // Bold text
-  write_string(&terminal, "\x1b[1mBold Text\n\x1b[22mNormal Text\n");
-  print_terminal(&terminal);
-
-  // Underlined text
-  write_string(&terminal, "\x1b[4mUnderlined Text\n\x1b[24mNormal Text\n");
-  print_terminal(&terminal);
-
-  // Reversed text
-  write_string(&terminal, "\x1b[7mReversed Text\n\x1b[27mNormal Text\n");
-  print_terminal(&terminal);
 }
