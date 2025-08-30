@@ -199,8 +199,7 @@ void print_terminal(Terminal* terminal) {
 }
 
 void init_screen(Screen* screen, int width, int height) {
-  screen->cursor.x = 0;
-  screen->cursor.y = 0;
+  bzero(&screen->cursor, sizeof(Cursor));
   screen->lines = (Line*)malloc(height * sizeof(Line));
   for (int i = 0; i < height; i++) {
     screen->lines[i].cells = (Cell*)malloc(width * sizeof(Cell));
