@@ -108,11 +108,14 @@ void print_cell_color(Attr attr) {
   if (attr.fg.type == COLOR_DEFAULT && attr.fg.color !=0) {
     printf("\x1b[%dm", attr.fg.color);
   }
-  if (attr.bg.color !=0) {
+  if (attr.bg.type == COLOR_DEFAULT && attr.bg.color !=0) {
     printf("\x1b[%dm", attr.bg.color);
   }
   if (attr.fg.type == COLOR_256) {
     printf("\x1b[38;5;%dm", attr.fg.color);
+  }
+  if (attr.bg.type == COLOR_256) {
+    printf("\x1b[48;5;%dm", attr.bg.color);
   }
   if (attr.bold) {
     printf("\x1b[1m");
@@ -330,6 +333,13 @@ void modify_cursor(Cursor** cursor, Token token) {
     return;
   }
 
+  if (starts_with(token.value, token.length, "48;5;")) {
+    int color = atoi(&token.value[5]);
+    (*cursor)->attr.bg.type = COLOR_256;
+    (*cursor)->attr.bg.color = color;
+    return;
+  }
+
   int num_semicolons = 0;
   for (int i = 0; i < token.length; i++) {
     if (token.value[i] == ';') {
@@ -428,4 +438,6 @@ int main() {
   test(&t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
   test(&t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
   test(&t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
+  test(&t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
+  test(&t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
 }
