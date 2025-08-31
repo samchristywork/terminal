@@ -105,11 +105,14 @@ void print_cursor_data(Cursor cursor) {
 }
 
 void print_cell_color(Attr attr) {
-  if (attr.fg.color !=0) {
+  if (attr.fg.type == COLOR_DEFAULT && attr.fg.color !=0) {
     printf("\x1b[%dm", attr.fg.color);
   }
   if (attr.bg.color !=0) {
     printf("\x1b[%dm", attr.bg.color);
+  }
+  if (attr.fg.type == COLOR_256) {
+    printf("\x1b[38;5;%dm", attr.fg.color);
   }
   if (attr.bold) {
     printf("\x1b[1m");
@@ -290,7 +293,9 @@ void write_regular_char(Screen* screen, char c, int width, int height, Attr attr
 void handle_field(Cursor** cursor, int value) {
   if (value == 0) {
     (*cursor)->attr.fg.color = 0;
+    (*cursor)->attr.fg.type = COLOR_DEFAULT;
     (*cursor)->attr.bg.color = 0;
+    (*cursor)->attr.bg.type = COLOR_DEFAULT;
     (*cursor)->attr.bold = 0;
     (*cursor)->attr.underline = 0;
     (*cursor)->attr.reverse = 0;
@@ -309,7 +314,22 @@ void handle_field(Cursor** cursor, int value) {
   }
 }
 
+bool starts_with(const char* str, int length, const char* prefix) {
+  int prefix_len = strlen(prefix);
+  if (length < prefix_len) {
+    return false;
+  }
+  return strncmp(str, prefix, prefix_len) == 0;
+}
+
 void modify_cursor(Cursor** cursor, Token token) {
+  if (starts_with(token.value, token.length, "38;5;")) {
+    int color = atoi(&token.value[5]);
+    (*cursor)->attr.fg.type = COLOR_256;
+    (*cursor)->attr.fg.color = color;
+    return;
+  }
+
   int num_semicolons = 0;
   for (int i = 0; i < token.length; i++) {
     if (token.value[i] == ';') {
@@ -407,4 +427,5 @@ int main() {
   test(&t, "Red background", "\x1b[41mRed background\x1b[0m\n");
   test(&t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
   test(&t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
+  test(&t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
 }
