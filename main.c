@@ -37,7 +37,7 @@ typedef struct {
 } Cell;
 
 typedef struct {
-  Cell* cells;
+  Cell *cells;
 } Line;
 
 typedef struct {
@@ -48,7 +48,7 @@ typedef struct {
 
 typedef struct {
   Cursor cursor;
-  Line* lines;
+  Line *lines;
 } Screen;
 
 typedef struct {
@@ -68,29 +68,30 @@ typedef enum {
 
 void print_token_type(TokenType type) {
   switch (type) {
-    case TOKEN_TEXT:
-      printf("%-17s", "TEXT");
-      break;
-    case TOKEN_NEWLINE:
-      printf("%-17s", "NEWLINE");
-      break;
-    case TOKEN_CARRIAGE_RETURN:
-      printf("%-17s", "CARRIAGE_RETURN");
-      break;
-    case TOKEN_GRAPHICS:
-      printf("%-17s", "GRAPHICS");
-      break;
+  case TOKEN_TEXT:
+    printf("%-17s", "TEXT");
+    break;
+  case TOKEN_NEWLINE:
+    printf("%-17s", "NEWLINE");
+    break;
+  case TOKEN_CARRIAGE_RETURN:
+    printf("%-17s", "CARRIAGE_RETURN");
+    break;
+  case TOKEN_GRAPHICS:
+    printf("%-17s", "GRAPHICS");
+    break;
   }
 }
 
 typedef struct {
   TokenType type;
+  // TODO: handle longer sequences
   char value[256];
   int length;
 } Token;
 
 typedef struct {
-  Token* tokens;
+  Token *tokens;
   int count;
 } Tokens;
 
@@ -98,17 +99,17 @@ const char INVERT_COLORS[] = "\x1b[7m";
 const char RESET_COLORS[] = "\x1b[0m";
 
 void print_cursor_data(Cursor cursor) {
-  printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, reverse=%d}\n",
-         cursor.x, cursor.y,
-         cursor.attr.fg.color, cursor.attr.bg.color,
+  printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, "
+         "reverse=%d}\n",
+         cursor.x, cursor.y, cursor.attr.fg.color, cursor.attr.bg.color,
          cursor.attr.bold, cursor.attr.underline, cursor.attr.reverse);
 }
 
 void print_cell_color(Attr attr) {
-  if (attr.fg.type == COLOR_DEFAULT && attr.fg.color !=0) {
+  if (attr.fg.type == COLOR_DEFAULT && attr.fg.color != 0) {
     printf("\x1b[%dm", attr.fg.color);
   }
-  if (attr.bg.type == COLOR_DEFAULT && attr.bg.color !=0) {
+  if (attr.bg.type == COLOR_DEFAULT && attr.bg.color != 0) {
     printf("\x1b[%dm", attr.bg.color);
   }
   if (attr.fg.type == COLOR_256) {
@@ -128,7 +129,7 @@ void print_cell_color(Attr attr) {
   }
 }
 
-void print_screen(Screen* screen, int width, int height) {
+void print_screen(Screen *screen, int width, int height) {
 #ifdef DEBUG
   print_cursor_data(screen->cursor);
 #endif
@@ -143,12 +144,12 @@ void print_screen(Screen* screen, int width, int height) {
       Cell cell = screen->lines[i].cells[j];
       print_cell_color(cell.attr);
       if (i == c.y && j == c.x) {
-        printf(INVERT_COLORS); // TODO: This is incorrect if cell is already reverse
+        // TODO: This is incorrect if cell is already reverse
+        printf(INVERT_COLORS);
       }
       if (cell.length > 0) {
+        // TODO: handle multi-byte characters
         printf("%c", cell.data[0]);
-        //printf("%x ", cell.data[0]);
-        //printf("x");
       } else {
         printf(" ");
       }
@@ -162,7 +163,7 @@ void print_screen(Screen* screen, int width, int height) {
   printf("\n");
 }
 
-void print_terminal(Terminal* terminal) {
+void print_terminal(Terminal *terminal) {
   if (terminal->using_alt_screen) {
     print_screen(&terminal->alt_screen, terminal->width, terminal->height);
   } else {
@@ -170,18 +171,18 @@ void print_terminal(Terminal* terminal) {
   }
 }
 
-void init_screen(Screen* screen, int width, int height) {
+void init_screen(Screen *screen, int width, int height) {
   bzero(&screen->cursor, sizeof(Cursor));
-  screen->lines = (Line*)malloc(height * sizeof(Line));
+  screen->lines = (Line *)malloc(height * sizeof(Line));
   for (int i = 0; i < height; i++) {
-    screen->lines[i].cells = (Cell*)malloc(width * sizeof(Cell));
+    screen->lines[i].cells = (Cell *)malloc(width * sizeof(Cell));
     for (int j = 0; j < width; j++) {
       bzero(&screen->lines[i].cells[j], sizeof(Cell));
     }
   }
 }
 
-void init_terminal(Terminal* terminal, int width, int height) {
+void init_terminal(Terminal *terminal, int width, int height) {
   terminal->width = width;
   terminal->height = height;
   terminal->using_alt_screen = false;
@@ -189,7 +190,7 @@ void init_terminal(Terminal* terminal, int width, int height) {
   init_screen(&terminal->alt_screen, width, height);
 }
 
-void scroll_screen(Screen* screen, int width, int height) {
+void scroll_screen(Screen *screen, int width, int height) {
   for (int j = 0; j < height - 1; j++) {
     for (int k = 0; k < width; k++) {
       screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
@@ -200,7 +201,7 @@ void scroll_screen(Screen* screen, int width, int height) {
   }
 }
 
-void scroll_terminal(Terminal* terminal) {
+void scroll_terminal(Terminal *terminal) {
   if (terminal->using_alt_screen) {
     scroll_screen(&terminal->alt_screen, terminal->width, terminal->height);
   } else {
@@ -217,7 +218,7 @@ void handle_newline(Screen *screen, int width, int height) {
   }
 }
 
-bool matches(const char* text, int length, int* index, const char* seq) {
+bool matches(const char *text, int length, int *index, const char *seq) {
   int seq_len = strlen(seq);
   if (*index + seq_len > length) {
     return false;
@@ -229,7 +230,7 @@ bool matches(const char* text, int length, int* index, const char* seq) {
   return false;
 }
 
-void add_token(Tokens* tokens, TokenType type, const char* value, int length) {
+void add_token(Tokens *tokens, TokenType type, const char *value, int length) {
   tokens->tokens[tokens->count].type = type;
   if (value != NULL && length > 0) {
     memcpy(tokens->tokens[tokens->count].value, value, length);
@@ -238,25 +239,26 @@ void add_token(Tokens* tokens, TokenType type, const char* value, int length) {
   tokens->count++;
 }
 
-bool is_color_code(const char* text, int length, int* index) {
-  if (text[*index] == '\x1b' && *index + 1 < length && text[*index + 1] == '[') {
+bool is_color_code(const char *text, int length, int *index) {
+  if (text[*index] == '\x1b' && *index + 1 < length &&
+      text[*index + 1] == '[') {
     *index += 2;
     return true;
   }
   return false;
 }
 
-Tokens *tokenize(const char* text, int length) {
-  Tokens* tokens = (Tokens*)malloc(sizeof(Tokens));
-  tokens->tokens = (Token*)malloc(128 * sizeof(Token));
+Tokens *tokenize(const char *text, int length) {
+  Tokens *tokens = (Tokens *)malloc(sizeof(Tokens));
+  tokens->tokens = (Token *)malloc(128 * sizeof(Token));
   tokens->count = 0;
 
   for (int i = 0; i < length; i++) {
     if (matches(text, length, &i, "\n")) {
       add_token(tokens, TOKEN_NEWLINE, NULL, 0);
-    }else if (matches(text, length, &i, "\r")) {
+    } else if (matches(text, length, &i, "\r")) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
-    }else if (is_color_code(text, length, &i)) {
+    } else if (is_color_code(text, length, &i)) {
       int start = i;
       while (i < length && text[i] != 'm') {
         i++;
@@ -268,7 +270,8 @@ Tokens *tokenize(const char* text, int length) {
       i--;
     } else {
       int start = i;
-      while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b') {
+      while (i < length && text[i] != '\n' && text[i] != '\r' &&
+             text[i] != '\x1b') {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, &text[start], i - start);
@@ -279,7 +282,8 @@ Tokens *tokenize(const char* text, int length) {
   return tokens;
 }
 
-void write_regular_char(Screen* screen, char c, int width, int height, Attr attr) {
+void write_regular_char(Screen *screen, char c, int width, int height,
+                        Attr attr) {
   if (screen->cursor.x >= width) {
     handle_newline(screen, width, height);
   }
@@ -293,7 +297,7 @@ void write_regular_char(Screen* screen, char c, int width, int height, Attr attr
   }
 }
 
-void handle_field(Cursor** cursor, int value) {
+void handle_field(Cursor **cursor, int value) {
   if (value == 0) {
     (*cursor)->attr.fg.color = 0;
     (*cursor)->attr.fg.type = COLOR_DEFAULT;
@@ -317,7 +321,7 @@ void handle_field(Cursor** cursor, int value) {
   }
 }
 
-bool starts_with(const char* str, int length, const char* prefix) {
+bool starts_with(const char *str, int length, const char *prefix) {
   int prefix_len = strlen(prefix);
   if (length < prefix_len) {
     return false;
@@ -325,7 +329,7 @@ bool starts_with(const char* str, int length, const char* prefix) {
   return strncmp(str, prefix, prefix_len) == 0;
 }
 
-void modify_cursor(Cursor** cursor, Token token) {
+void modify_cursor(Cursor **cursor, Token token) {
   if (starts_with(token.value, token.length, "38;5;")) {
     int color = atoi(&token.value[5]);
     (*cursor)->attr.fg.type = COLOR_256;
@@ -348,11 +352,11 @@ void modify_cursor(Cursor** cursor, Token token) {
   }
 
   for (int i = 0; i <= num_semicolons; i++) {
-    char* token_copy = (char*)malloc((token.length + 1) * sizeof(char));
+    char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
     memcpy(token_copy, token.value, token.length);
     token_copy[token.length] = '\0';
 
-    char* part = strtok(token_copy, ";");
+    char *part = strtok(token_copy, ";");
     for (int j = 0; j < i; j++) {
       part = strtok(NULL, ";");
     }
@@ -366,7 +370,7 @@ void modify_cursor(Cursor** cursor, Token token) {
   }
 }
 
-void write_terminal(Terminal* terminal, const char* text, int length) {
+void write_terminal(Terminal *terminal, const char *text, int length) {
   Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
   int height = terminal->height;
@@ -388,9 +392,11 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
         if (terminal->using_alt_screen) {
-          write_regular_char(&terminal->alt_screen, token.value[j], width, height, terminal->alt_screen.cursor.attr);
+          write_regular_char(&terminal->alt_screen, token.value[j], width,
+                             height, terminal->alt_screen.cursor.attr);
         } else {
-          write_regular_char(&terminal->screen, token.value[j], width, height, terminal->screen.cursor.attr);
+          write_regular_char(&terminal->screen, token.value[j], width, height,
+                             terminal->screen.cursor.attr);
         }
       }
     } else if (token.type == TOKEN_NEWLINE) {
@@ -406,17 +412,18 @@ void write_terminal(Terminal* terminal, const char* text, int length) {
         terminal->screen.cursor.x = 0;
       }
     } else if (token.type == TOKEN_GRAPHICS) {
-      Cursor* cursor = terminal->using_alt_screen ? &terminal->alt_screen.cursor : &terminal->screen.cursor;
+      Cursor *cursor = terminal->using_alt_screen ? &terminal->alt_screen.cursor
+                                                  : &terminal->screen.cursor;
       modify_cursor(&cursor, token);
     }
   }
 }
 
-void write_string(Terminal* terminal, const char* str) {
+void write_string(Terminal *terminal, const char *str) {
   write_terminal(terminal, str, strlen(str));
 }
 
-void test(Terminal* terminal, const char* test_name, const char* input) {
+void test(Terminal *terminal, const char *test_name, const char *input) {
   printf("=== %s ===\n", test_name);
   write_string(terminal, input);
   print_terminal(terminal);
