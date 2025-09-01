@@ -65,6 +65,8 @@ typedef enum {
   TOKEN_CARRIAGE_RETURN,
   TOKEN_GRAPHICS,
   TOKEN_ERASE_DISPLAY,                    // ESC[J
+  TOKEN_ERASE_FROM_CURSOR_TO_END,         // ESC[0J
+  TOKEN_UNKNOWN,
 } TokenType;
 
 void print_token_type(TokenType type) {
@@ -267,6 +269,8 @@ Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[J")) {
       add_token(tokens, TOKEN_ERASE_DISPLAY, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[0J")) {
+      add_token(tokens, TOKEN_ERASE_FROM_CURSOR_TO_END, NULL, 0);
     } else if (is_csi_code(text, length, &i)) {
       int start = i;
       while (i < length && text[i] != 'm') {
@@ -423,6 +427,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
+    } else if (token.type == TOKEN_ERASE_FROM_CURSOR_TO_END) {
+      for (int j = cursor->y; j < height; j++) {
+        for (int k = 0; k < width; k++) {
+          if (j == cursor->y && k < cursor->x) {
+            continue;
+          }
+          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+        }
+      }
     }
   }
 }
@@ -456,4 +469,5 @@ int main() {
   test(&t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
   test(&t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
   test(&t, "Erase in display", "This is a line\r\x1b[JErased\n");
+  test(&t, "Erase in display", "This is a line\r\x1b[0JErased\n");
 }
