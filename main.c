@@ -421,19 +421,21 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_ERASE_DISPLAY) {
       for (int j = cursor->y; j < height; j++) {
         for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k < cursor->x) {
-            continue;
+          if (j == cursor->y && k >= cursor->x) {
+            bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          } else if (j > cursor->y) {
+            bzero(&screen->lines[j].cells[k], sizeof(Cell));
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_FROM_CURSOR_TO_END) {
       for (int j = cursor->y; j < height; j++) {
         for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k < cursor->x) {
-            continue;
+          if (j == cursor->y && k >= cursor->x) {
+            bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          } else if (j > cursor->y) {
+            bzero(&screen->lines[j].cells[k], sizeof(Cell));
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
     }
