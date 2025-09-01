@@ -64,6 +64,7 @@ typedef enum {
   TOKEN_NEWLINE,
   TOKEN_CARRIAGE_RETURN,
   TOKEN_GRAPHICS,
+  TOKEN_ERASE_DISPLAY,                    // ESC[J
 } TokenType;
 
 void print_token_type(TokenType type) {
@@ -79,6 +80,12 @@ void print_token_type(TokenType type) {
     break;
   case TOKEN_GRAPHICS:
     printf("%-17s", "GRAPHICS");
+    break;
+  case TOKEN_UNKNOWN:
+    printf("%-17s", "UNKNOWN");
+    break;
+  default:
+    printf("%-17s type=%d, ", "INVALID", type);
     break;
   }
 }
@@ -239,7 +246,7 @@ void add_token(Tokens *tokens, TokenType type, const char *value, int length) {
   tokens->count++;
 }
 
-bool is_color_code(const char *text, int length, int *index) {
+bool is_csi_code(const char *text, int length, int *index) {
   if (text[*index] == '\x1b' && *index + 1 < length &&
       text[*index + 1] == '[') {
     *index += 2;
@@ -258,7 +265,9 @@ Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_NEWLINE, NULL, 0);
     } else if (matches(text, length, &i, "\r")) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
-    } else if (is_color_code(text, length, &i)) {
+    } else if (matches(text, length, &i, "\x1b[J")) {
+      add_token(tokens, TOKEN_ERASE_DISPLAY, NULL, 0);
+    } else if (is_csi_code(text, length, &i)) {
       int start = i;
       while (i < length && text[i] != 'm') {
         i++;
@@ -389,32 +398,31 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
+
+    Screen *screen = terminal->using_alt_screen
+                         ? &terminal->alt_screen
+                         : &terminal->screen;
+    Cursor *cursor = &screen->cursor;
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
-        if (terminal->using_alt_screen) {
-          write_regular_char(&terminal->alt_screen, token.value[j], width,
-                             height, terminal->alt_screen.cursor.attr);
-        } else {
-          write_regular_char(&terminal->screen, token.value[j], width, height,
-                             terminal->screen.cursor.attr);
-        }
+        write_regular_char(screen, token.value[j], width,
+                           height, cursor->attr);
       }
     } else if (token.type == TOKEN_NEWLINE) {
-      if (terminal->using_alt_screen) {
-        handle_newline(&terminal->alt_screen, width, height);
-      } else {
-        handle_newline(&terminal->screen, width, height);
-      }
+      handle_newline(screen, width, height);
     } else if (token.type == TOKEN_CARRIAGE_RETURN) {
-      if (terminal->using_alt_screen) {
-        terminal->alt_screen.cursor.x = 0;
-      } else {
-        terminal->screen.cursor.x = 0;
-      }
+      cursor->x = 0;
     } else if (token.type == TOKEN_GRAPHICS) {
-      Cursor *cursor = terminal->using_alt_screen ? &terminal->alt_screen.cursor
-                                                  : &terminal->screen.cursor;
       modify_cursor(&cursor, token);
+    } else if (token.type == TOKEN_ERASE_DISPLAY) {
+      for (int j = cursor->y; j < height; j++) {
+        for (int k = 0; k < width; k++) {
+          if (j == cursor->y && k < cursor->x) {
+            continue;
+          }
+          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+        }
+      }
     }
   }
 }
@@ -447,4 +455,5 @@ int main() {
   test(&t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
   test(&t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
   test(&t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
+  test(&t, "Erase in display", "This is a line\r\x1b[JErased\n");
 }
