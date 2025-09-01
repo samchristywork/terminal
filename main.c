@@ -64,9 +64,12 @@ typedef enum {
   TOKEN_NEWLINE,
   TOKEN_CARRIAGE_RETURN,
   TOKEN_GRAPHICS,
-  TOKEN_ERASE_DISPLAY,                    // ESC[J
-  TOKEN_ERASE_FROM_CURSOR_TO_END,         // ESC[0J
-  TOKEN_ERASE_FROM_CURSOR_TO_BEGINNING,   // ESC[1J
+  TOKEN_ERASE_EOL,  // ESC[K ESC[0K
+  TOKEN_ERASE_SOL,  // ESC[1K
+  TOKEN_ERASE_LINE, // ESC[2K
+  TOKEN_ERASE_DOWN, // ESC[J ESC[0J
+  TOKEN_ERASE_UP,   // ESC[1J
+  TOKEN_ERASE_ALL,  // ESC[2J
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -269,11 +272,21 @@ Tokens *tokenize(const char *text, int length) {
     } else if (matches(text, length, &i, "\r")) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[J")) {
-      add_token(tokens, TOKEN_ERASE_DISPLAY, NULL, 0);
+      add_token(tokens, TOKEN_ERASE_DOWN, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[0J")) {
-      add_token(tokens, TOKEN_ERASE_FROM_CURSOR_TO_END, NULL, 0);
+      add_token(tokens, TOKEN_ERASE_DOWN, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[1J")) {
-      add_token(tokens, TOKEN_ERASE_FROM_CURSOR_TO_BEGINNING, NULL, 0);
+      add_token(tokens, TOKEN_ERASE_UP, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[2J")) {
+      add_token(tokens, TOKEN_ERASE_ALL, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[K")) {
+      add_token(tokens, TOKEN_ERASE_EOL, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[0K")) {
+      add_token(tokens, TOKEN_ERASE_EOL, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[1K")) {
+      add_token(tokens, TOKEN_ERASE_SOL, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[2K")) {
+      add_token(tokens, TOKEN_ERASE_LINE, NULL, 0);
     } else if (is_csi_code(text, length, &i)) {
       int start = i;
       while (i < length && text[i] != 'm') {
@@ -421,34 +434,40 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       cursor->x = 0;
     } else if (token.type == TOKEN_GRAPHICS) {
       modify_cursor(&cursor, token);
-    } else if (token.type == TOKEN_ERASE_DISPLAY) {
+    } else if (token.type == TOKEN_ERASE_EOL) {
+      for (int j = cursor->x; j < width; j++) {
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+      }
+    } else if (token.type == TOKEN_ERASE_SOL) {
+      for (int j = 0; j <= cursor->x; j++) {
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+      }
+    } else if (token.type == TOKEN_ERASE_LINE) {
+      for (int j = 0; j < width; j++) {
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+      }
+    } else if (token.type == TOKEN_ERASE_DOWN) {
       for (int j = cursor->y; j < height; j++) {
         for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k >= cursor->x) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
-          } else if (j > cursor->y) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          if (j == cursor->y && k < cursor->x) {
+            continue;
           }
+          bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
-    } else if (token.type == TOKEN_ERASE_FROM_CURSOR_TO_END) {
-      for (int j = cursor->y; j < height; j++) {
-        for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k >= cursor->x) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
-          } else if (j > cursor->y) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
-          }
-        }
-      }
-    } else if (token.type == TOKEN_ERASE_FROM_CURSOR_TO_BEGINNING) {
+    } else if (token.type == TOKEN_ERASE_UP) {
       for (int j = 0; j <= cursor->y; j++) {
         for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k <= cursor->x) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
-          } else if (j < cursor->y) {
-            bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          if (j == cursor->y && k > cursor->x) {
+            continue;
           }
+          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+        }
+      }
+    } else if (token.type == TOKEN_ERASE_ALL) {
+      for (int j = 0; j < height; j++) {
+        for (int k = 0; k < width; k++) {
+          bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
     }
@@ -483,7 +502,7 @@ int main() {
   test(&t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
   test(&t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
   test(&t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
-  test(&t, "Erase in display", "This is a line\r\x1b[JErased\n");
-  test(&t, "Erase in display", "This is a line\r\x1b[0JErased\n");
-  test(&t, "Erase from cursor to beginning", "xThis is a line\r\x1b[1J\n");
+  test(&t, "Erase until end of line", "Hello, World!\rHello,\x1b[K Mark!\n");
+  test(&t, "Erase until start of line", "Hello, World!\rHello,\x1b[1K Mark!\n");
+  test(&t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
 }
