@@ -71,6 +71,7 @@ typedef enum {
   TOKEN_ERASE_DOWN,      // ESC[J ESC[0J
   TOKEN_ERASE_UP,        // ESC[1J
   TOKEN_ERASE_ALL,       // ESC[2J
+  TOKEN_HOME,            // ESC[H
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -290,6 +291,8 @@ Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_ERASE_SOL, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[2K")) {
       add_token(tokens, TOKEN_ERASE_LINE, NULL, 0);
+    } else if (matches(text, length, &i, "\x1b[H")) {
+      add_token(tokens, TOKEN_HOME, NULL, 0);
     } else if (is_csi_code(text, length, &i)) {
       int start = i;
       while (i < length && text[i] != 'm') {
@@ -483,6 +486,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
+    } else if (token.type == TOKEN_HOME) {
+      cursor->x = 0;
+      cursor->y = 0;
     }
   }
 }
