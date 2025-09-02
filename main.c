@@ -76,32 +76,6 @@ typedef enum {
   TOKEN_UNKNOWN,
 } TokenType;
 
-void print_token_type(TokenType type) {
-  switch (type) {
-  case TOKEN_TEXT:
-    printf("%-17s", "TEXT");
-    break;
-  case TOKEN_NEWLINE:
-    printf("%-17s", "NEWLINE");
-    break;
-  case TOKEN_CARRIAGE_RETURN:
-    printf("%-17s", "CARRIAGE_RETURN");
-    break;
-  case TOKEN_GRAPHICS:
-    printf("%-17s", "GRAPHICS");
-    break;
-  case TOKEN_CUP:
-    printf("%-17s", "CUP");
-    break;
-  case TOKEN_UNKNOWN:
-    printf("%-17s", "UNKNOWN");
-    break;
-  default:
-    printf("%-17stype=%d, ", "INVALID", type);
-    break;
-  }
-}
-
 typedef struct {
   TokenType type;
   // TODO: handle longer sequences
@@ -465,6 +439,18 @@ void modify_cursor(Cursor **cursor, Token token) {
   }
 }
 
+void print_token(Token t) {
+  printf("%d: ", t.type);
+  for (int i = 0; i < t.length; i++) {
+    if (isprint(t.value[i])) {
+      printf("%c", t.value[i]);
+    } else {
+      printf("\\x%02x", (unsigned char)t.value[i]);
+    }
+  }
+  printf("\n");
+}
+
 void write_terminal(Terminal *terminal, const char *text, int length) {
   Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
@@ -473,12 +459,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 #ifdef DEBUG
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
-    print_token_type(token.type);
-    printf("len=%d, val=", token.length);
-    for (int j = 0; j < token.length; j++) {
-      printf("%x ", token.value[j]);
-    }
-    printf("\n");
+    print_token(token);
   }
 #endif
 
