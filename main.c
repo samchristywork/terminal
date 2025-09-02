@@ -62,15 +62,15 @@ typedef struct {
 
 typedef enum {
   TOKEN_TEXT,
-  TOKEN_NEWLINE,
-  TOKEN_CARRIAGE_RETURN,
-  TOKEN_GRAPHICS,
-  TOKEN_ERASE_EOL,  // ESC[K ESC[0K
-  TOKEN_ERASE_SOL,  // ESC[1K
-  TOKEN_ERASE_LINE, // ESC[2K
-  TOKEN_ERASE_DOWN, // ESC[J ESC[0J
-  TOKEN_ERASE_UP,   // ESC[1J
-  TOKEN_ERASE_ALL,  // ESC[2J
+  TOKEN_NEWLINE,         // \n
+  TOKEN_CARRIAGE_RETURN, // \r
+  TOKEN_GRAPHICS,        // ESC[...m
+  TOKEN_ERASE_EOL,       // ESC[K ESC[0K
+  TOKEN_ERASE_SOL,       // ESC[1K
+  TOKEN_ERASE_LINE,      // ESC[2K
+  TOKEN_ERASE_DOWN,      // ESC[J ESC[0J
+  TOKEN_ERASE_UP,        // ESC[1J
+  TOKEN_ERASE_ALL,       // ESC[2J
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -498,26 +498,50 @@ void test(Terminal *terminal, const char *test_name, const char *input) {
   printf("\n");
 }
 
+void reset_terminal(Terminal *t) {
+  write_string(t, "\x1b[0m\x1b[2J\x1b[H");
+}
+
+void basic_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Normal text", "Hello, World!\n");
+  test(t, "Carriage return", "Hello,\rWorld!\n");
+}
+
+void color_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Red text", "\x1b[31mThis is red text\x1b[0m\n");
+  test(t, "Red and blue text", "\x1b[31mRed \x1b[34mBlue\x1b[0m Normal\n");
+  test(t, "Red background", "\x1b[41mRed background\x1b[0m\n");
+  test(t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
+  test(t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
+  test(t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
+  test(t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
+  test(t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
+  test(t, "Color types", "\x1b[31mDefault Red\x1b[0m\n\x1b[91mBright Red\x1b[0m\n\x1b[1;31mBold Red\x1b[0m\n\x1b[38;5;196m256 Red\x1b[0m\n");
+  test(t, "Background color types", "\x1b[41mDefault Red BG\x1b[0m\n\x1b[101mBright Red BG\x1b[0m\n\x1b[1;41mBold Red BG\x1b[0m\n\x1b[48;5;196m256 Red BG\x1b[0m\n");
+}
+
+void attribute_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Bold", "\x1b[1mThis is bold text\x1b[0m\n");
+  test(t, "Reverse", "\x1b[7mReverse text\x1b[0m\n");
+  test(t, "Bold, underline, reverse", "\x1b[1mBold \x1b[0m\x1b[4mUnderline\x1b[0m \x1b[7mReverse\x1b[0m\n");
+}
+
+void erase_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Erase until end of line", "Hello, World!\rHello,\x1b[K Mark!\n");
+  test(t, "Erase until start of line", "Hello, World!\rHello,\x1b[1K Mark!\n");
+  test(t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
+}
+
 int main() {
   Terminal t;
   init_terminal(&t, 30, 10);
 
-  test(&t, "Normal text", "Hello, World!\n");
-  test(&t, "Carriage return", "Hello,\rWorld!\n");
-  test(&t, "Red text", "\x1b[31mThis is red text\x1b[0m\n");
-  test(&t, "Red and blue text", "\x1b[31mRed \x1b[34mBlue\x1b[0m Normal\n");
-  test(&t, "Bold", "\x1b[1mThis is bold text\x1b[0m\n");
-  test(&t, "Reverse", "\x1b[7mReverse text\x1b[0m\n");
-  test(&t, "Bold, underline, reverse", "\x1b[1mBold \x1b[0m\x1b[4mUnderline\x1b[0m \x1b[7mReverse\x1b[0m\n");
-  test(&t, "Red background", "\x1b[41mRed background\x1b[0m\n");
-  test(&t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
-  test(&t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
-  test(&t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
-  test(&t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
-  test(&t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
-  test(&t, "Erase until end of line", "Hello, World!\rHello,\x1b[K Mark!\n");
-  test(&t, "Erase until start of line", "Hello, World!\rHello,\x1b[1K Mark!\n");
-  test(&t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
-  test(&t, "Color types", "\x1b[31mDefault Red\x1b[0m\n\x1b[91mBright Red\x1b[0m\n\x1b[1;31mBold Red\x1b[0m\n\x1b[38;5;196m256 Red\x1b[0m\n");
-  test(&t, "Background color types", "\x1b[41mDefault Red BG\x1b[0m\n\x1b[101mBright Red BG\x1b[0m\n\x1b[1;41mBold Red BG\x1b[0m\n\x1b[48;5;196m256 Red BG\x1b[0m\n");
+  basic_tests(&t);
+  color_tests(&t);
+  attribute_tests(&t);
+  erase_tests(&t);
 }
