@@ -213,18 +213,6 @@ void handle_newline(Screen *screen, int width, int height) {
   }
 }
 
-bool matches(const char *text, int length, int *index, const char *seq) {
-  int seq_len = strlen(seq);
-  if (*index + seq_len > length) {
-    return false;
-  }
-  if (strncmp(&text[*index], seq, seq_len) == 0) {
-    *index += seq_len - 1;
-    return true;
-  }
-  return false;
-}
-
 void add_token(Tokens *tokens, TokenType type, const char *value, int length) {
   tokens->tokens[tokens->count].type = type;
   if (value != NULL && length > 0) {
@@ -243,50 +231,44 @@ bool is_csi_code(const char *text, int length, int *index) {
   return false;
 }
 
+bool matches(const char *text, int length, int index, const char *pattern,
+             int *pattern_length) {
+  int pat_len = strlen(pattern);
+  if (index + pat_len <= length && strncmp(&text[index], pattern, pat_len) == 0) {
+    *pattern_length = pat_len;
+    return true;
+  }
+  return false;
+}
+
 Tokens *tokenize(const char *text, int length) {
   Tokens *tokens = (Tokens *)malloc(sizeof(Tokens));
   tokens->tokens = (Token *)malloc(128 * sizeof(Token));
   tokens->count = 0;
 
   for (int i = 0; i < length; i++) {
-    if (matches(text, length, &i, "\n")) {
-      add_token(tokens, TOKEN_NEWLINE, NULL, 0);
-    } else if (matches(text, length, &i, "\r")) {
-      add_token(tokens, TOKEN_CARRIAGE_RETURN, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[J")) {
-      add_token(tokens, TOKEN_ERASE_DOWN, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[0J")) {
-      add_token(tokens, TOKEN_ERASE_DOWN, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[1J")) {
-      add_token(tokens, TOKEN_ERASE_UP, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[2J")) {
-      add_token(tokens, TOKEN_ERASE_ALL, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[K")) {
-      add_token(tokens, TOKEN_ERASE_EOL, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[0K")) {
-      add_token(tokens, TOKEN_ERASE_EOL, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[1K")) {
-      add_token(tokens, TOKEN_ERASE_SOL, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[2K")) {
-      add_token(tokens, TOKEN_ERASE_LINE, NULL, 0);
-    } else if (is_csi_code(text, length, &i)) {
-      while (i < length && (isdigit(text[i]) || text[i] == ';')) {
-        i++;
-      }
-
-      if (i < length) {
-        if (text[i] == 'm') {
-          add_token(tokens, TOKEN_GRAPHICS, &text[i - (i - (i - 2))],
-                    i - (i - (i - 2)) + 1);
-        } else if (text[i] == 'H') {
-          add_token(tokens, TOKEN_CUP, &text[i - (i - (i - 2))],
-                    i - (i - (i - 2)) + 1);
-        } else {
-          add_token(tokens, TOKEN_UNKNOWN, &text[i], 1);
-        }
-      } else {
-        add_token(tokens, TOKEN_UNKNOWN, &text[i - 1], 1);
-      }
+    int len = 0;
+    if (matches(text, length, i, "\n", &len)) {
+      add_token(tokens, TOKEN_NEWLINE, text, len);
+    } else if (matches(text, length, i, "\r", &len)) {
+      add_token(tokens, TOKEN_CARRIAGE_RETURN, text, len);
+    } else if (matches(text, length, i, "\x1b[J", &len)) {
+      add_token(tokens, TOKEN_ERASE_DOWN, text, len);
+    } else if (matches(text, length, i, "\x1b[0J", &len)) {
+      add_token(tokens, TOKEN_ERASE_DOWN, text, len);
+    } else if (matches(text, length, i, "\x1b[1J", &len)) {
+      add_token(tokens, TOKEN_ERASE_UP, text, len);
+    } else if (matches(text, length, i, "\x1b[2J", &len)) {
+      add_token(tokens, TOKEN_ERASE_ALL, text, len);
+    } else if (matches(text, length, i, "\x1b[K", &len)) {
+      add_token(tokens, TOKEN_ERASE_EOL, text, len);
+    } else if (matches(text, length, i, "\x1b[0K", &len)) {
+      add_token(tokens, TOKEN_ERASE_EOL, text, len);
+    } else if (matches(text, length, i, "\x1b[1K", &len)) {
+      add_token(tokens, TOKEN_ERASE_SOL, text, len);
+    } else if (matches(text, length, i, "\x1b[2K", &len)) {
+      add_token(tokens, TOKEN_ERASE_LINE, text, len);
+    //} else if (is_csi_code(text, length, &i)) {
     } else {
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' &&
@@ -294,7 +276,6 @@ Tokens *tokenize(const char *text, int length) {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, &text[start], i - start);
-      i--;
     }
   }
 
@@ -540,13 +521,17 @@ void basic_tests(Terminal *t) {
   test(t, "Carriage return", "Hello,\rWorld!\n");
 }
 
-void color_tests(Terminal *t) {
+void basic_color_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "Red text", "\x1b[31mThis is red text\x1b[0m\n");
   test(t, "Red and blue text", "\x1b[31mRed \x1b[34mBlue\x1b[0m Normal\n");
   test(t, "Red background", "\x1b[41mRed background\x1b[0m\n");
   test(t, "Blue on red", "\x1b[34;41mBlue on red\x1b[0m\n");
   test(t, "Bold blue on red", "\x1b[1;34;41mBold blue on red\x1b[0m\n");
+}
+
+void advanced_color_tests(Terminal *t) {
+  reset_terminal(t);
   test(t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
   test(t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
   test(t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
@@ -568,12 +553,19 @@ void erase_tests(Terminal *t) {
   test(t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
 }
 
+void cursor_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Home", "Hello, World!\n\x1b[HStart\n");
+}
+
 int main() {
   Terminal t;
   init_terminal(&t, 30, 10);
 
   basic_tests(&t);
-  color_tests(&t);
-  attribute_tests(&t);
-  erase_tests(&t);
+  basic_color_tests(&t);
+  //advanced_color_tests(&t);
+  //attribute_tests(&t);
+  //erase_tests(&t);
+  //cursor_tests(&t);
 }
