@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef struct {
   int red;
@@ -71,7 +72,7 @@ typedef enum {
   TOKEN_ERASE_DOWN,      // ESC[J ESC[0J
   TOKEN_ERASE_UP,        // ESC[1J
   TOKEN_ERASE_ALL,       // ESC[2J
-  TOKEN_HOME,            // ESC[H
+  TOKEN_CUP,             // ESC[..H
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -89,11 +90,14 @@ void print_token_type(TokenType type) {
   case TOKEN_GRAPHICS:
     printf("%-17s", "GRAPHICS");
     break;
+  case TOKEN_CUP:
+    printf("%-17s", "CUP");
+    break;
   case TOKEN_UNKNOWN:
     printf("%-17s", "UNKNOWN");
     break;
   default:
-    printf("%-17s type=%d, ", "INVALID", type);
+    printf("%-17stype=%d, ", "INVALID", type);
     break;
   }
 }
@@ -291,18 +295,24 @@ Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_ERASE_SOL, NULL, 0);
     } else if (matches(text, length, &i, "\x1b[2K")) {
       add_token(tokens, TOKEN_ERASE_LINE, NULL, 0);
-    } else if (matches(text, length, &i, "\x1b[H")) {
-      add_token(tokens, TOKEN_HOME, NULL, 0);
     } else if (is_csi_code(text, length, &i)) {
-      int start = i;
-      while (i < length && text[i] != 'm') {
+      while (i < length && (isdigit(text[i]) || text[i] == ';')) {
         i++;
       }
+
       if (i < length) {
-        i++;
+        if (text[i] == 'm') {
+          add_token(tokens, TOKEN_GRAPHICS, &text[i - (i - (i - 2))],
+                    i - (i - (i - 2)) + 1);
+        } else if (text[i] == 'H') {
+          add_token(tokens, TOKEN_CUP, &text[i - (i - (i - 2))],
+                    i - (i - (i - 2)) + 1);
+        } else {
+          add_token(tokens, TOKEN_UNKNOWN, &text[i], 1);
+        }
+      } else {
+        add_token(tokens, TOKEN_UNKNOWN, &text[i - 1], 1);
       }
-      add_token(tokens, TOKEN_GRAPHICS, &text[start], i - start);
-      i--;
     } else {
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' &&
@@ -376,44 +386,82 @@ bool starts_with(const char *str, int length, const char *prefix) {
   return strncmp(str, prefix, prefix_len) == 0;
 }
 
+bool ends_with(const char *str, int length, char suffix) {
+  if (length < 1) {
+    return false;
+  }
+  return str[length - 1] == suffix;
+}
+
 void modify_cursor(Cursor **cursor, Token token) {
-  if (starts_with(token.value, token.length, "38;5;")) {
-    int color = atoi(&token.value[5]);
-    (*cursor)->attr.fg.type = COLOR_256;
-    (*cursor)->attr.fg.color = color;
-    return;
-  }
+  if (ends_with(token.value, token.length, 'H')) {
+    printf("CUP: %.*s\n", token.length, token.value);
+    int row = 1;
+    int col = 1;
 
-  if (starts_with(token.value, token.length, "48;5;")) {
-    int color = atoi(&token.value[5]);
-    (*cursor)->attr.bg.type = COLOR_256;
-    (*cursor)->attr.bg.color = color;
-    return;
-  }
-
-  int num_semicolons = 0;
-  for (int i = 0; i < token.length; i++) {
-    if (token.value[i] == ';') {
-      num_semicolons++;
-    }
-  }
-
-  for (int i = 0; i <= num_semicolons; i++) {
     char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
     memcpy(token_copy, token.value, token.length);
     token_copy[token.length] = '\0';
 
     char *part = strtok(token_copy, ";");
-    for (int j = 0; j < i; j++) {
-      part = strtok(NULL, ";");
-    }
-
     if (part != NULL) {
-      int num = atoi(part);
-      handle_field(cursor, num);
+      row = atoi(part);
+      part = strtok(NULL, ";");
+      if (part != NULL) {
+        col = atoi(part);
+      }
     }
 
     free(token_copy);
+
+    if (row < 1) {
+      row = 1;
+    }
+    if (col < 1) {
+      col = 1;
+    }
+
+    (*cursor)->y = row - 1;
+    (*cursor)->x = col - 1;
+  } else {
+    if (starts_with(token.value, token.length, "38;5;")) {
+      int color = atoi(&token.value[5]);
+      (*cursor)->attr.fg.type = COLOR_256;
+      (*cursor)->attr.fg.color = color;
+      return;
+    }
+
+    if (starts_with(token.value, token.length, "48;5;")) {
+      int color = atoi(&token.value[5]);
+      (*cursor)->attr.bg.type = COLOR_256;
+      (*cursor)->attr.bg.color = color;
+      return;
+    }
+
+    int num_semicolons = 0;
+    for (int i = 0; i < token.length; i++) {
+      if (token.value[i] == ';') {
+        num_semicolons++;
+      }
+    }
+
+    for (int i = 0; i <= num_semicolons; i++) {
+      char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
+      memcpy(token_copy, token.value, token.length);
+      token_copy[token.length] = '\0';
+
+      char *part = strtok(token_copy, ";");
+      for (int j = 0; j < i; j++) {
+        part = strtok(NULL, ";");
+      }
+
+      if (part != NULL) {
+        int num = atoi(part);
+        handle_field(cursor, num);
+      }
+
+      free(token_copy);
+    }
   }
 }
 
@@ -448,7 +496,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       handle_newline(screen, width, height);
     } else if (token.type == TOKEN_CARRIAGE_RETURN) {
       cursor->x = 0;
-    } else if (token.type == TOKEN_GRAPHICS) {
+    } else if (token.type == TOKEN_GRAPHICS || token.type == TOKEN_CUP) {
       modify_cursor(&cursor, token);
     } else if (token.type == TOKEN_ERASE_EOL) {
       for (int j = cursor->x; j < width; j++) {
@@ -486,9 +534,6 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
-    } else if (token.type == TOKEN_HOME) {
-      cursor->x = 0;
-      cursor->y = 0;
     }
   }
 }
