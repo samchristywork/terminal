@@ -10,6 +10,7 @@ typedef struct {
 
 typedef enum {
   COLOR_DEFAULT,
+  COLOR_BRIGHT,
   COLOR_256,
   COLOR_RGB,
 } ColorType;
@@ -119,10 +120,12 @@ void print_cursor_data(Cursor cursor) {
 }
 
 void print_cell_color(Attr attr) {
-  if (attr.fg.type == COLOR_DEFAULT && attr.fg.color != 0) {
+  if ((attr.fg.type == COLOR_DEFAULT || attr.fg.type == COLOR_BRIGHT) &&
+      attr.fg.color != 0) {
     printf("\x1b[%dm", attr.fg.color);
   }
-  if (attr.bg.type == COLOR_DEFAULT && attr.bg.color != 0) {
+  if ((attr.bg.type == COLOR_DEFAULT || attr.bg.type == COLOR_BRIGHT) &&
+      attr.bg.color != 0) {
     printf("\x1b[%dm", attr.bg.color);
   }
   if (attr.fg.type == COLOR_256) {
@@ -347,6 +350,18 @@ void handle_field(Cursor **cursor, int value) {
   } else if (value >= 40 && value <= 47) {
     (*cursor)->attr.bg.type = COLOR_DEFAULT;
     (*cursor)->attr.bg.color = value;
+  } else if (value >= 90 && value <= 97) {
+    (*cursor)->attr.fg.type = COLOR_BRIGHT;
+    (*cursor)->attr.fg.color = value;
+  } else if (value >= 100 && value <= 107) {
+    (*cursor)->attr.bg.type = COLOR_BRIGHT;
+    (*cursor)->attr.bg.color = value;
+  } else if (value == 22) {
+    (*cursor)->attr.bold = 0;
+  } else if (value == 24) {
+    (*cursor)->attr.underline = 0;
+  } else if (value == 27) {
+    (*cursor)->attr.reverse = 0;
   }
 }
 
@@ -419,14 +434,12 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   for (int i = 0; i < tokens->count; i++) {
     Token token = tokens->tokens[i];
 
-    Screen *screen = terminal->using_alt_screen
-                         ? &terminal->alt_screen
-                         : &terminal->screen;
+    Screen *screen =
+        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     Cursor *cursor = &screen->cursor;
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
-        write_regular_char(screen, token.value[j], width,
-                           height, cursor->attr);
+        write_regular_char(screen, token.value[j], width, height, cursor->attr);
       }
     } else if (token.type == TOKEN_NEWLINE) {
       handle_newline(screen, width, height);
@@ -505,4 +518,6 @@ int main() {
   test(&t, "Erase until end of line", "Hello, World!\rHello,\x1b[K Mark!\n");
   test(&t, "Erase until start of line", "Hello, World!\rHello,\x1b[1K Mark!\n");
   test(&t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
+  test(&t, "Color types", "\x1b[31mDefault Red\x1b[0m\n\x1b[91mBright Red\x1b[0m\n\x1b[1;31mBold Red\x1b[0m\n\x1b[38;5;196m256 Red\x1b[0m\n");
+  test(&t, "Background color types", "\x1b[41mDefault Red BG\x1b[0m\n\x1b[101mBright Red BG\x1b[0m\n\x1b[1;41mBold Red BG\x1b[0m\n\x1b[48;5;196m256 Red BG\x1b[0m\n");
 }
