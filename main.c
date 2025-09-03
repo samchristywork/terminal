@@ -353,6 +353,14 @@ void handle_field(Cursor **cursor, int value) {
   }
 }
 
+bool starts_with(const char *str, int length, const char *prefix) {
+  int prefix_len = strlen(prefix);
+  if (length < prefix_len) {
+    return false;
+  }
+  return strncmp(str, prefix, prefix_len) == 0;
+}
+
 bool ends_with(const char *str, int length, char suffix) {
   if (length < 1) {
     return false;
@@ -370,7 +378,45 @@ void modify_cursor(Cursor **cursor, Token token) {
   }
   printf("\n");
 
-  if (ends_with(token.value, token.length, 'm')) {
+  if (starts_with(token.value, token.length, "\x1b[38;5;")) {
+    if (token.length < 8) {
+      return;
+    }
+
+    char num_str[16];
+    int num_len = token.length - 8;
+    if (num_len >= sizeof(num_str)) {
+      num_len = sizeof(num_str) - 1;
+    }
+    memcpy(num_str, &token.value[7], num_len);
+    num_str[num_len] = '\0';
+    int num = atoi(num_str);
+    if (num < 0 || num > 255) {
+      return;
+    }
+
+    (*cursor)->attr.fg.type = COLOR_256;
+    (*cursor)->attr.fg.color = num;
+  } else if (starts_with(token.value, token.length, "\x1b[48;5;")) {
+    if (token.length < 8) {
+      return;
+    }
+
+    char num_str[16];
+    int num_len = token.length - 8;
+    if (num_len >= sizeof(num_str)) {
+      num_len = sizeof(num_str) - 1;
+    }
+    memcpy(num_str, &token.value[7], num_len);
+    num_str[num_len] = '\0';
+    int num = atoi(num_str);
+    if (num < 0 || num > 255) {
+      return;
+    }
+
+    (*cursor)->attr.bg.type = COLOR_256;
+    (*cursor)->attr.bg.color = num;
+  } else if (ends_with(token.value, token.length, 'm')) {
     if (token.length < 3) {
       return;
     }
