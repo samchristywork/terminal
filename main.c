@@ -353,14 +353,6 @@ void handle_field(Cursor **cursor, int value) {
   }
 }
 
-bool starts_with(const char *str, int length, const char *prefix) {
-  int prefix_len = strlen(prefix);
-  if (length < prefix_len) {
-    return false;
-  }
-  return strncmp(str, prefix, prefix_len) == 0;
-}
-
 bool ends_with(const char *str, int length, char suffix) {
   if (length < 1) {
     return false;
@@ -369,8 +361,41 @@ bool ends_with(const char *str, int length, char suffix) {
 }
 
 void modify_cursor(Cursor **cursor, Token token) {
-  if (ends_with(token.value, token.length, 'H')) {
-    printf("CUP: %.*s\n", token.length, token.value);
+  for (int i = 0; i < token.length; i++) {
+    if (isprint(token.value[i])) {
+      printf("%c", token.value[i]);
+    } else {
+      printf("\\x%02x", (unsigned char)token.value[i]);
+    }
+  }
+  printf("\n");
+
+  if (ends_with(token.value, token.length, 'm')) {
+    if (token.length < 3) {
+      return;
+    }
+
+    for(int i = 2; i < token.length - 1; ) {
+      int j = i;
+      while (j < token.length - 1 && token.value[j] != ';') {
+        j++;
+      }
+      char num_str[16];
+      int num_len = j - i;
+      if (num_len >= sizeof(num_str)) {
+        num_len = sizeof(num_str) - 1;
+      }
+      memcpy(num_str, &token.value[i], num_len);
+      num_str[num_len] = '\0';
+      int num = atoi(num_str);
+      handle_field(cursor, num);
+      i = j + 1;
+    }
+  } else if (ends_with(token.value, token.length, 'H')) {
+    if (token.length < 3) {
+      return;
+    }
+
     int row = 1;
     int col = 1;
 
@@ -378,7 +403,7 @@ void modify_cursor(Cursor **cursor, Token token) {
     memcpy(token_copy, token.value, token.length);
     token_copy[token.length] = '\0';
 
-    char *part = strtok(token_copy, ";");
+    char *part = strtok(token_copy + 2, ";");
     if (part != NULL) {
       row = atoi(part);
       part = strtok(NULL, ";");
@@ -398,45 +423,6 @@ void modify_cursor(Cursor **cursor, Token token) {
 
     (*cursor)->y = row - 1;
     (*cursor)->x = col - 1;
-  } else {
-    if (starts_with(token.value, token.length, "38;5;")) {
-      int color = atoi(&token.value[5]);
-      (*cursor)->attr.fg.type = COLOR_256;
-      (*cursor)->attr.fg.color = color;
-      return;
-    }
-
-    if (starts_with(token.value, token.length, "48;5;")) {
-      int color = atoi(&token.value[5]);
-      (*cursor)->attr.bg.type = COLOR_256;
-      (*cursor)->attr.bg.color = color;
-      return;
-    }
-
-    int num_semicolons = 0;
-    for (int i = 0; i < token.length; i++) {
-      if (token.value[i] == ';') {
-        num_semicolons++;
-      }
-    }
-
-    for (int i = 0; i <= num_semicolons; i++) {
-      char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
-      memcpy(token_copy, token.value, token.length);
-      token_copy[token.length] = '\0';
-
-      char *part = strtok(token_copy, ";");
-      for (int j = 0; j < i; j++) {
-        part = strtok(NULL, ";");
-      }
-
-      if (part != NULL) {
-        int num = atoi(part);
-        handle_field(cursor, num);
-      }
-
-      free(token_copy);
-    }
   }
 }
 
