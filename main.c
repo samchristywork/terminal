@@ -72,6 +72,7 @@ typedef enum {
   TOKEN_ERASE_DOWN,      // ESC[J ESC[0J
   TOKEN_ERASE_UP,        // ESC[1J
   TOKEN_ERASE_ALL,       // ESC[2J
+  TOKEN_ALT_SCREEN,      // ESC[?1049h
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -288,6 +289,9 @@ Tokens *tokenize(const char *text, int length) {
       i += len - 1;
     } else if (is_csi_code(text, length, i, &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+      i += len - 1;
+    } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
+      add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
       i += len - 1;
     } else {
       int start = i;
@@ -548,6 +552,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
+    } else if (token.type == TOKEN_ALT_SCREEN) {
+      terminal->using_alt_screen = true;
     }
   }
 }
@@ -608,6 +614,14 @@ void erase_tests(Terminal *t) {
 void cursor_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "Home", "Hello, World!\n\x1b[HStart\n");
+  test(t, "3", "\x1b[3HHello");
+  test(t, "5, 5", "\x1b[5;5HHello");
+}
+
+void alt_screen_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Main Screen", "Hello, Main Screen!\n");
+  test(t, "Switch to alt screen", "\x1b[?1049hHello, Alt Screen!\n");
 }
 
 int main() {
@@ -616,8 +630,9 @@ int main() {
 
   basic_tests(&t);
   basic_color_tests(&t);
-  //advanced_color_tests(&t);
-  //attribute_tests(&t);
-  //erase_tests(&t);
-  //cursor_tests(&t);
+  advanced_color_tests(&t);
+  attribute_tests(&t);
+  erase_tests(&t); // Rewrite these
+  cursor_tests(&t); // Rewrite these
+  alt_screen_tests(&t);
 }
