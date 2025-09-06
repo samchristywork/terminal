@@ -73,6 +73,7 @@ typedef enum {
   TOKEN_ERASE_UP,        // ESC[1J
   TOKEN_ERASE_ALL,       // ESC[2J
   TOKEN_ALT_SCREEN,      // ESC[?1049h
+  TOKEN_MAIN_SCREEN,     // ESC[?1049l
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -292,6 +293,9 @@ Tokens *tokenize(const char *text, int length) {
       i += len - 1;
     } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
       add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
+      i += len - 1;
+    } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
+      add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
       i += len - 1;
     } else {
       int start = i;
@@ -554,6 +558,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       }
     } else if (token.type == TOKEN_ALT_SCREEN) {
       terminal->using_alt_screen = true;
+    } else if (token.type == TOKEN_MAIN_SCREEN) {
+      terminal->using_alt_screen = false;
     }
   }
 }
@@ -622,6 +628,8 @@ void alt_screen_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "Main Screen", "Hello, Main Screen!\n");
   test(t, "Switch to alt screen", "\x1b[?1049hHello, Alt Screen!\n");
+  test(t, "Switch back to main screen", "\x1b[?1049l");
+  test(t, "Switch to alt screen again", "\x1b[?1049h");
 }
 
 int main() {
