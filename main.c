@@ -646,6 +646,11 @@ void alt_screen_tests(Terminal *t) {
   test(t, "Switch to alt screen again", "\x1b[?1049h");
 }
 
+void tab_tests(Terminal *t) {
+  reset_terminal(t);
+  test(t, "Tabs", "Col1\tCol2\tCol3\nData1\tData2\tData3\n");
+}
+
 int main() {
   Terminal t;
   init_terminal(&t, 30, 10);
@@ -657,4 +662,5 @@ int main() {
   erase_tests(&t); // Rewrite these
   cursor_tests(&t); // Rewrite these
   alt_screen_tests(&t);
+  tab_tests(&t);
 }
