@@ -74,6 +74,7 @@ typedef enum {
   TOKEN_ERASE_ALL,       // ESC[2J
   TOKEN_ALT_SCREEN,      // ESC[?1049h
   TOKEN_MAIN_SCREEN,     // ESC[?1049l
+  TOKEN_TAB,             // \t
   TOKEN_UNKNOWN,
 } TokenType;
 
@@ -297,9 +298,12 @@ Tokens *tokenize(const char *text, int length) {
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
       i += len - 1;
+    } else if (matches(text, length, i, "\t", &len)) {
+      add_token(tokens, TOKEN_TAB, text, i, len);
+      i += len - 1;
     } else {
       int start = i;
-      while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b') {
+      while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b' && text[i] != '\t') {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
@@ -560,6 +564,13 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       terminal->using_alt_screen = true;
     } else if (token.type == TOKEN_MAIN_SCREEN) {
       terminal->using_alt_screen = false;
+    } else if (token.type == TOKEN_TAB) {
+      int next_tab_stop = ((cursor->x / 8) + 1) * 8;
+      if (next_tab_stop >= width) {
+        handle_newline(screen, width, height);
+      } else {
+        cursor->x = next_tab_stop;
+      }
     }
   }
 }
