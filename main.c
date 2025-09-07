@@ -234,7 +234,7 @@ bool is_csi_code(const char *text, int length, int index, int *code_length) {
     while (i < length && (isdigit(text[i]) || text[i] == ';')) {
       i++;
     }
-    if (i < length && (text[i] == 'm' || text[i] == 'H')) {
+    if (i < length && (text[i] == 'm' || text[i] == 'H' || text[i] == 'f')) {
       *code_length = i - index + 1;
       return true;
     }
@@ -449,7 +449,8 @@ void modify_cursor(Cursor **cursor, Token token) {
       handle_field(cursor, num);
       i = j + 1;
     }
-  } else if (ends_with(token.value, token.length, 'H')) {
+  } else if (ends_with(token.value, token.length, 'H') ||
+             ends_with(token.value, token.length, 'f')) {
     if (token.length < 3) {
       return;
     }
@@ -631,8 +632,10 @@ void erase_tests(Terminal *t) {
 void cursor_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "Home", "Hello, World!\n\x1b[HStart\n");
+  test(t, "Home 2", "\x1b[fHello");
   test(t, "3", "\x1b[3HHello");
   test(t, "5, 5", "\x1b[5;5HHello");
+  test(t, "6, 5", "\x1b[6;5fHello");
 }
 
 void alt_screen_tests(Terminal *t) {
