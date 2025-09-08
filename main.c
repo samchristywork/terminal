@@ -631,11 +631,13 @@ void erase_tests(Terminal *t) {
 
 void cursor_tests(Terminal *t) {
   reset_terminal(t);
-  test(t, "Home", "Hello, World!\n\x1b[HStart\n");
-  test(t, "Home 2", "\x1b[fHello");
-  test(t, "3", "\x1b[3HHello");
-  test(t, "5, 5", "\x1b[5;5HHello");
-  test(t, "6, 5", "\x1b[6;5fHello");
+  test(t, "Setup", " <\n <\n <\n\n  > <\n\n> <");
+  test(t, "Home", "\x1b[Hx");
+  test(t, "Home 2", "\x1b[fo");
+  test(t, "Move to row 2", "\x1b[2Ho");
+  test(t, "Move to row 3", "\x1b[3fo");
+  test(t, "Move to 5,4", "\x1b[5;4Ho");
+  test(t, "Move to 7,2", "\x1b[7;2fo");
 }
 
 void alt_screen_tests(Terminal *t) {
