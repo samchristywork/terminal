@@ -624,9 +624,14 @@ void attribute_tests(Terminal *t) {
 
 void erase_tests(Terminal *t) {
   reset_terminal(t);
-  test(t, "Erase until end of line", "Hello, World!\rHello,\x1b[K Mark!\n");
-  test(t, "Erase until start of line", "Hello, World!\rHello,\x1b[1K Mark!\n");
-  test(t, "Erase entire line", "Hello, World!\rHello,\x1b[2KMark!\n");
+  test(t, "Setup", "Hello, World!\nHello, World!\nHello, World!\n");
+  test(t, "Erase to end of line", "\x1b[2;7H\x1b[K");
+  test(t, "Erase to start of line", "\x1b[1;7H\x1b[1K");
+  test(t, "Erase entire line", "\x1b[3;7H\x1b[2K");
+  test(t, "Setup", "\x1b[HHello, World!\nHello, World!\nHello, World!\n");
+  test(t, "Erase down", "\x1b[2;7H\x1b[J");
+  test(t, "Setup", "\x1b[HHello, World!\nHello, World!\nHello, World!\n");
+  test(t, "Erase up", "\x1b[2;7H\x1b[1J");
 }
 
 void cursor_tests(Terminal *t) {
@@ -661,8 +666,8 @@ int main() {
   basic_color_tests(&t);
   advanced_color_tests(&t);
   attribute_tests(&t);
-  erase_tests(&t); // Rewrite these
-  cursor_tests(&t); // Rewrite these
+  erase_tests(&t);
+  cursor_tests(&t);
   alt_screen_tests(&t);
   tab_tests(&t);
 }
