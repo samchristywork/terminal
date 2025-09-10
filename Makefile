@@ -6,6 +6,9 @@ build/main: build/main.o build/terminal.o
 build/test: build/test.o build/terminal.o
 	${CC} build/*.o -o $@
 
+build/example: build/example.o build/terminal.o
+	${CC} build/*.o -o $@
+
 build/%.o: src/%.c
 	mkdir -p build
 	$(CC) -c $< -o $@
