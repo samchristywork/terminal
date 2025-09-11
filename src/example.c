@@ -112,14 +112,26 @@ int main() {
   Terminal t;
   init_terminal(&t, 80, 20);
 
-  char buf[100];
-  bzero(buf, sizeof(buf));
-  while (1) {
-    char *ret = fgets(buf, sizeof(buf) - 1, stdin);
-    if (ret == NULL)
-      break;
+  int stdin_pipe[2];
+  int stdout_pipe[2];
 
-    write_chunk(&t, buf);
-    bzero(buf, sizeof(buf));
+  if (setup_pipes(stdin_pipe, stdout_pipe) != 0) {
+    return 1;
+  }
+
+  pid_t pid = fork();
+
+  if (pid == -1) {
+    perror("fork");
+    return 1;
+  }
+
+  if (pid == 0) {
+    return execute_child_process(stdin_pipe, stdout_pipe);
+  } else {
+    handle_io(stdin_pipe, stdout_pipe, &t);
+
+    int status;
+    waitpid(pid, &status, 0);
   }
 }
