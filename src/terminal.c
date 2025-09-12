@@ -1,7 +1,7 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "terminal.h"
 
@@ -133,8 +133,8 @@ void handle_newline(Screen *screen, int width, int height) {
 void add_token(Tokens *tokens, TokenType type, const char *value,
                int start_index, int length) {
   if (tokens->count % 128 == 0) {
-    tokens->tokens = (Token *)realloc(
-        tokens->tokens, (tokens->count + 128) * sizeof(Token));
+    tokens->tokens =
+        (Token *)realloc(tokens->tokens, (tokens->count + 128) * sizeof(Token));
   }
   Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
@@ -160,7 +160,8 @@ bool is_csi_code(const char *text, int length, int index, int *code_length) {
 bool matches(const char *text, int length, int index, const char *pattern,
              int *pattern_length) {
   int pat_len = strlen(pattern);
-  if (index + pat_len <= length && strncmp(&text[index], pattern, pat_len) == 0) {
+  if (index + pat_len <= length &&
+      strncmp(&text[index], pattern, pat_len) == 0) {
     *pattern_length = pat_len;
     return true;
   }
@@ -218,7 +219,8 @@ Tokens *tokenize(const char *text, int length) {
       i += len - 1;
     } else {
       int start = i;
-      while (i < length && text[i] != '\n' && text[i] != '\r' && text[i] != '\x1b' && text[i] != '\t') {
+      while (i < length && text[i] != '\n' && text[i] != '\r' &&
+             text[i] != '\x1b' && text[i] != '\t') {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
@@ -351,7 +353,7 @@ void modify_cursor(Cursor **cursor, Token token) {
       return;
     }
 
-    for(int i = 2; i < token.length - 1; ) {
+    for (int i = 2; i < token.length - 1;) {
       int j = i;
       while (j < token.length - 1 && token.value[j] != ';') {
         j++;

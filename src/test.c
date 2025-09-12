@@ -9,9 +9,7 @@ void test(Terminal *terminal, const char *test_name, const char *input) {
   printf("\n");
 }
 
-void reset_terminal(Terminal *t) {
-  write_string(t, "\x1b[0m\x1b[2J\x1b[H");
-}
+void reset_terminal(Terminal *t) { write_string(t, "\x1b[0m\x1b[2J\x1b[H"); }
 
 void basic_tests(Terminal *t) {
   reset_terminal(t);
@@ -31,17 +29,25 @@ void basic_color_tests(Terminal *t) {
 void advanced_color_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "256 color", "\x1b[38;5;82m256 color green text\x1b[0m\n");
-  test(t, "256 orange background", "\x1b[48;5;208m256 color orange background\x1b[0m\n");
-  test(t, "256 blue on 256 orange", "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
-  test(t, "Color types", "\x1b[31mDefault Red\x1b[0m\n\x1b[91mBright Red\x1b[0m\n\x1b[1;31mBold Red\x1b[0m\n\x1b[38;5;196m256 Red\x1b[0m\n");
-  test(t, "Background color types", "\x1b[41mDefault Red BG\x1b[0m\n\x1b[101mBright Red BG\x1b[0m\n\x1b[1;41mBold Red BG\x1b[0m\n\x1b[48;5;196m256 Red BG\x1b[0m\n");
+  test(t, "256 orange background",
+       "\x1b[48;5;208m256 color orange background\x1b[0m\n");
+  test(t, "256 blue on 256 orange",
+       "\x1b[38;5;21m\x1b[48;5;208m256 blue on 256 orange\x1b[0m\n");
+  test(t, "Color types",
+       "\x1b[31mDefault Red\x1b[0m\n\x1b[91mBright Red\x1b[0m\n\x1b[1;31mBold "
+       "Red\x1b[0m\n\x1b[38;5;196m256 Red\x1b[0m\n");
+  test(t, "Background color types",
+       "\x1b[41mDefault Red BG\x1b[0m\n\x1b[101mBright Red "
+       "BG\x1b[0m\n\x1b[1;41mBold Red BG\x1b[0m\n\x1b[48;5;196m256 Red "
+       "BG\x1b[0m\n");
 }
 
 void attribute_tests(Terminal *t) {
   reset_terminal(t);
   test(t, "Bold", "\x1b[1mThis is bold text\x1b[0m\n");
   test(t, "Reverse", "\x1b[7mReverse text\x1b[0m\n");
-  test(t, "Bold, underline, reverse", "\x1b[1mBold \x1b[0m\x1b[4mUnderline\x1b[0m \x1b[7mReverse\x1b[0m\n");
+  test(t, "Bold, underline, reverse",
+       "\x1b[1mBold \x1b[0m\x1b[4mUnderline\x1b[0m \x1b[7mReverse\x1b[0m\n");
 }
 
 void erase_tests(Terminal *t) {
