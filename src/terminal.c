@@ -193,6 +193,9 @@ Tokens *tokenize(const char *text, int length) {
     } else if (matches(text, length, i, "\x1b[2J", &len)) {
       add_token(tokens, TOKEN_ERASE_ALL, text, i, len);
       i += len - 1;
+    } else if (matches(text, length, i, "\x1b[3J", &len)) {
+      add_token(tokens, TOKEN_ERASE_SCROLLBACK, text, i, len);
+      i += len - 1;
     } else if (matches(text, length, i, "\x1b[K", &len)) {
       add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
       i += len - 1;
@@ -481,6 +484,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           bzero(&screen->lines[j].cells[k], sizeof(Cell));
         }
       }
+    } else if (token.type == TOKEN_ERASE_SCROLLBACK) {
     } else if (token.type == TOKEN_ALT_SCREEN) {
       terminal->using_alt_screen = true;
     } else if (token.type == TOKEN_MAIN_SCREEN) {

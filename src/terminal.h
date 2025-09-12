@@ -61,18 +61,19 @@ typedef struct {
 
 typedef enum {
   TOKEN_TEXT,
-  TOKEN_NEWLINE,         // \n
-  TOKEN_CARRIAGE_RETURN, // \r
-  TOKEN_CSI_CODE,        // ESC[...m ESC[..H
-  TOKEN_ERASE_EOL,       // ESC[K ESC[0K
-  TOKEN_ERASE_SOL,       // ESC[1K
-  TOKEN_ERASE_LINE,      // ESC[2K
-  TOKEN_ERASE_DOWN,      // ESC[J ESC[0J
-  TOKEN_ERASE_UP,        // ESC[1J
-  TOKEN_ERASE_ALL,       // ESC[2J
-  TOKEN_ALT_SCREEN,      // ESC[?1049h
-  TOKEN_MAIN_SCREEN,     // ESC[?1049l
-  TOKEN_TAB,             // \t
+  TOKEN_NEWLINE,          // \n
+  TOKEN_CARRIAGE_RETURN,  // \r
+  TOKEN_CSI_CODE,         // ESC[...m ESC[..H
+  TOKEN_ERASE_EOL,        // ESC[K ESC[0K
+  TOKEN_ERASE_SOL,        // ESC[1K
+  TOKEN_ERASE_LINE,       // ESC[2K
+  TOKEN_ERASE_DOWN,       // ESC[J ESC[0J
+  TOKEN_ERASE_UP,         // ESC[1J
+  TOKEN_ERASE_ALL,        // ESC[2J
+  TOKEN_ERASE_SCROLLBACK, // ESC[3J
+  TOKEN_ALT_SCREEN,       // ESC[?1049h
+  TOKEN_MAIN_SCREEN,      // ESC[?1049l
+  TOKEN_TAB,              // \t
   TOKEN_UNKNOWN,
 } TokenType;
 
