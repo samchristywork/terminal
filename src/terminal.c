@@ -223,6 +223,9 @@ Tokens *tokenize(const char *text, int length) {
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
       i--;
+      if (i <= start) {
+        i++;
+      }
     }
   }
 
