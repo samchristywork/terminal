@@ -177,50 +177,36 @@ Tokens *tokenize(const char *text, int length) {
     int len = 0;
     if (matches(text, length, i, "\n", &len)) {
       add_token(tokens, TOKEN_NEWLINE, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\r", &len)) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[J", &len)) {
       add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[0J", &len)) {
       add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[1J", &len)) {
       add_token(tokens, TOKEN_ERASE_UP, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[2J", &len)) {
       add_token(tokens, TOKEN_ERASE_ALL, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[3J", &len)) {
       add_token(tokens, TOKEN_ERASE_SCROLLBACK, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[K", &len)) {
       add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[0K", &len)) {
       add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[1K", &len)) {
       add_token(tokens, TOKEN_ERASE_SOL, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[2K", &len)) {
       add_token(tokens, TOKEN_ERASE_LINE, text, i, len);
-      i += len - 1;
     } else if (is_csi_code(text, length, i, &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
       add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
-      i += len - 1;
     } else if (matches(text, length, i, "\t", &len)) {
       add_token(tokens, TOKEN_TAB, text, i, len);
-      i += len - 1;
     } else {
+      len = 1;
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' &&
              text[i] != '\x1b' && text[i] != '\t') {
@@ -232,6 +218,7 @@ Tokens *tokenize(const char *text, int length) {
         i++;
       }
     }
+    i += len - 1;
   }
 
   return tokens;
