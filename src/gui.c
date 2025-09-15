@@ -9,6 +9,8 @@ int main() {
   Window window;
   GC gc;
   XEvent event;
+  XFontStruct *font_info;
+  const char *text = "Testing X11 GUI";
   int screen;
   unsigned long black, white;
   int running = 1;
@@ -34,6 +36,13 @@ int main() {
   XSetForeground(display, gc, white);
   XSetBackground(display, gc, black);
 
+  font_info = XLoadQueryFont(display, "fixed");
+  if (!font_info) {
+    fprintf(stderr, "Cannot load font: fixed\n");
+    return 1;
+  }
+  XSetFont(display, gc, font_info->fid);
+
   XMapWindow(display, window);
 
   while (running) {
@@ -42,6 +51,7 @@ int main() {
     switch (event.type) {
     case Expose:
       XClearWindow(display, window);
+      XDrawString(display, window, gc, 50, 100, text, strlen(text));
       break;
     case KeyPress:
     case ButtonPress:
@@ -51,6 +61,7 @@ int main() {
   }
 
   XFreeGC(display, gc);
+  XUnloadFont(display, font_info->fid);
   XDestroyWindow(display, window);
   XCloseDisplay(display);
 
