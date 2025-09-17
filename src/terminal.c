@@ -8,14 +8,14 @@
 const char INVERT_COLORS[] = "\x1b[7m";
 const char RESET_COLORS[] = "\x1b[0m";
 
-void print_cursor_data(Cursor cursor) {
+void print_cursor_data(Term_Cursor cursor) {
   printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, "
          "reverse=%d}\n",
          cursor.x, cursor.y, cursor.attr.fg.color, cursor.attr.bg.color,
          cursor.attr.bold, cursor.attr.underline, cursor.attr.reverse);
 }
 
-void print_cell_color(Attr attr) {
+void print_cell_color(Term_Attr attr) {
   if ((attr.fg.type == COLOR_DEFAULT || attr.fg.type == COLOR_BRIGHT) &&
       attr.fg.color != 0) {
     printf("\x1b[%dm", attr.fg.color);
@@ -41,7 +41,7 @@ void print_cell_color(Attr attr) {
   }
 }
 
-void print_screen(Screen *screen, int width, int height) {
+void print_screen(Term_Screen *screen, int width, int height) {
 #ifdef DEBUG
   print_cursor_data(screen->cursor);
 #endif
@@ -52,8 +52,8 @@ void print_screen(Screen *screen, int width, int height) {
   for (int i = 0; i < height; i++) {
     printf("|");
     for (int j = 0; j < width; j++) {
-      Cursor c = screen->cursor;
-      Cell cell = screen->lines[i].cells[j];
+      Term_Cursor c = screen->cursor;
+      Term_Cell cell = screen->lines[i].cells[j];
       print_cell_color(cell.attr);
       if (i == c.y && j == c.x) {
         // TODO: This is incorrect if cell is already reverse
@@ -83,13 +83,13 @@ void print_terminal(Terminal *terminal) {
   }
 }
 
-void init_screen(Screen *screen, int width, int height) {
-  bzero(&screen->cursor, sizeof(Cursor));
-  screen->lines = (Line *)malloc(height * sizeof(Line));
+void init_screen(Term_Screen *screen, int width, int height) {
+  bzero(&screen->cursor, sizeof(Term_Cursor));
+  screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
   for (int i = 0; i < height; i++) {
-    screen->lines[i].cells = (Cell *)malloc(width * sizeof(Cell));
+    screen->lines[i].cells = (Term_Cell *)malloc(width * sizeof(Term_Cell));
     for (int j = 0; j < width; j++) {
-      bzero(&screen->lines[i].cells[j], sizeof(Cell));
+      bzero(&screen->lines[i].cells[j], sizeof(Term_Cell));
     }
   }
 }
@@ -102,14 +102,14 @@ void init_terminal(Terminal *terminal, int width, int height) {
   init_screen(&terminal->alt_screen, width, height);
 }
 
-void scroll_screen(Screen *screen, int width, int height) {
+void scroll_screen(Term_Screen *screen, int width, int height) {
   for (int j = 0; j < height - 1; j++) {
     for (int k = 0; k < width; k++) {
       screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
     }
   }
   for (int k = 0; k < width; k++) {
-    bzero(&screen->lines[height - 1].cells[k], sizeof(Cell));
+    bzero(&screen->lines[height - 1].cells[k], sizeof(Term_Cell));
   }
 }
 
@@ -121,7 +121,7 @@ void scroll_terminal(Terminal *terminal) {
   }
 }
 
-void handle_newline(Screen *screen, int width, int height) {
+void handle_newline(Term_Screen *screen, int width, int height) {
   screen->cursor.x = 0;
   screen->cursor.y++;
   if (screen->cursor.y >= height) {
@@ -130,13 +130,13 @@ void handle_newline(Screen *screen, int width, int height) {
   }
 }
 
-void add_token(Tokens *tokens, TokenType type, const char *value,
+void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
                int start_index, int length) {
   if (tokens->count % 128 == 0) {
-    tokens->tokens =
-        (Token *)realloc(tokens->tokens, (tokens->count + 128) * sizeof(Token));
+    tokens->tokens = (Term_Token *)realloc(
+        tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
   }
-  Token *token = &tokens->tokens[tokens->count++];
+  Term_Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
   token->length = length;
   memcpy(token->value, &value[start_index], length);
@@ -168,9 +168,9 @@ bool matches(const char *text, int length, int index, const char *pattern,
   return false;
 }
 
-Tokens *tokenize(const char *text, int length) {
-  Tokens *tokens = (Tokens *)malloc(sizeof(Tokens));
-  tokens->tokens = (Token *)malloc(128 * sizeof(Token));
+Term_Tokens *tokenize(const char *text, int length) {
+  Term_Tokens *tokens = (Term_Tokens *)malloc(sizeof(Term_Tokens));
+  tokens->tokens = (Term_Token *)malloc(128 * sizeof(Term_Token));
   tokens->count = 0;
 
   for (int i = 0; i < length; i++) {
@@ -224,14 +224,14 @@ Tokens *tokenize(const char *text, int length) {
   return tokens;
 }
 
-void write_regular_char(Screen *screen, char c, int width, int height,
-                        Attr attr) {
+void write_regular_char(Term_Screen *screen, char c, int width, int height,
+                        Term_Attr attr) {
   if (screen->cursor.x >= width) {
     handle_newline(screen, width, height);
   }
 
   if (screen->cursor.y < height) {
-    Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
+    Term_Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
     cell->data[0] = c;
     cell->length = 1;
     cell->attr = attr;
@@ -239,7 +239,7 @@ void write_regular_char(Screen *screen, char c, int width, int height,
   }
 }
 
-void handle_field(Cursor **cursor, int value) {
+void handle_field(Term_Cursor **cursor, int value) {
   if (value == 0) {
     (*cursor)->attr.fg.color = 0;
     (*cursor)->attr.fg.type = COLOR_DEFAULT;
@@ -290,7 +290,7 @@ bool ends_with(const char *str, int length, char suffix) {
   return str[length - 1] == suffix;
 }
 
-void modify_cursor(Cursor **cursor, Token token) {
+void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   for (int i = 0; i < token.length; i++) {
     if (isprint(token.value[i])) {
       printf("%c", token.value[i]);
@@ -395,7 +395,7 @@ void modify_cursor(Cursor **cursor, Token token) {
   }
 }
 
-void print_token(Token t) {
+void print_token(Term_Token t) {
   printf("%d: ", t.type);
   for (int i = 0; i < t.length; i++) {
     if (isprint(t.value[i])) {
@@ -408,7 +408,7 @@ void print_token(Token t) {
 }
 
 void write_terminal(Terminal *terminal, const char *text, int length) {
-  Tokens *tokens = tokenize(text, length);
+  Term_Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
   int height = terminal->height;
 
@@ -420,11 +420,11 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 #endif
 
   for (int i = 0; i < tokens->count; i++) {
-    Token token = tokens->tokens[i];
+    Term_Token token = tokens->tokens[i];
 
-    Screen *screen =
+    Term_Screen *screen =
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
-    Cursor *cursor = &screen->cursor;
+    Term_Cursor *cursor = &screen->cursor;
     if (token.type == TOKEN_TEXT) {
       for (int j = 0; j < token.length; j++) {
         write_regular_char(screen, token.value[j], width, height, cursor->attr);
@@ -437,15 +437,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       modify_cursor(&cursor, token);
     } else if (token.type == TOKEN_ERASE_EOL) {
       for (int j = cursor->x; j < width; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_SOL) {
       for (int j = 0; j <= cursor->x; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_LINE) {
       for (int j = 0; j < width; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Cell));
+        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_DOWN) {
       for (int j = cursor->y; j < height; j++) {
@@ -453,7 +453,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           if (j == cursor->y && k < cursor->x) {
             continue;
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_UP) {
@@ -462,13 +462,13 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           if (j == cursor->y && k > cursor->x) {
             continue;
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_ALL) {
       for (int j = 0; j < height; j++) {
         for (int k = 0; k < width; k++) {
-          bzero(&screen->lines[j].cells[k], sizeof(Cell));
+          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_SCROLLBACK) {
