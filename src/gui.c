@@ -1,69 +1,60 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-int main() {
+#include "terminal.h"
+
+typedef struct {
   Display *display;
   Window window;
   GC gc;
-  XEvent event;
   XFontStruct *font_info;
-  const char *text = "Testing X11 GUI";
   int screen;
   unsigned long black, white;
-  int running = 1;
+  unsigned long colors[16];
+  int char_width, char_height;
+  int char_ascent;
+} GuiContext;
 
-  display = XOpenDisplay(NULL);
-  if (display == NULL) {
-    fprintf(stderr, "Cannot open display\n");
-    return 1;
-  }
+void init_colors(GuiContext *gui) {
+  Colormap colormap = DefaultColormap(gui->display, gui->screen);
+  XColor color;
 
-  screen = DefaultScreen(display);
-  black = BlackPixel(display, screen);
-  white = WhitePixel(display, screen);
+  unsigned long color_values[] = {
+      0x000000, // black
+      0x800000, // red
+      0x008000, // green
+      0x808000, // yellow
+      0x000080, // blue
+      0x800080, // magenta
+      0x008080, // cyan
+      0xc0c0c0, // white
+      0x808080, // bright black
+      0xff0000, // bright red
+      0x00ff00, // bright green
+      0xffff00, // bright yellow
+      0x0000ff, // bright blue
+      0xff00ff, // bright magenta
+      0x00ffff, // bright cyan
+      0xffffff  // bright white
+  };
 
-  window = XCreateSimpleWindow(display, RootWindow(display, screen), 100, 100,
-                               400, 200, 0, white, black);
+  for (int i = 0; i < 16; i++) {
+    color.red = ((color_values[i] >> 16) & 0xff) << 8;
+    color.green = ((color_values[i] >> 8) & 0xff) << 8;
+    color.blue = (color_values[i] & 0xff) << 8;
+    color.flags = DoRed | DoGreen | DoBlue;
 
-  XSelectInput(display, window, ExposureMask | KeyPressMask | ButtonPressMask);
-
-  XStoreName(display, window, "X11 Window");
-
-  gc = XCreateGC(display, window, 0, NULL);
-  XSetForeground(display, gc, white);
-  XSetBackground(display, gc, black);
-
-  font_info = XLoadQueryFont(display, "fixed");
-  if (!font_info) {
-    fprintf(stderr, "Cannot load font: fixed\n");
-    return 1;
-  }
-  XSetFont(display, gc, font_info->fid);
-
-  XMapWindow(display, window);
-
-  while (running) {
-    XNextEvent(display, &event);
-
-    switch (event.type) {
-    case Expose:
-      XClearWindow(display, window);
-      XDrawString(display, window, gc, 50, 100, text, strlen(text));
-      break;
-    case KeyPress:
-    case ButtonPress:
-      running = 0;
-      break;
+    if (XAllocColor(gui->display, colormap, &color)) {
+      gui->colors[i] = color.pixel;
+    } else {
+      gui->colors[i] = (i < 8) ? gui->black : gui->white;
     }
   }
+}
 
-  XFreeGC(display, gc);
-  XUnloadFont(display, font_info->fid);
-  XDestroyWindow(display, window);
-  XCloseDisplay(display);
-
-  return 0;
+int main() {
 }
