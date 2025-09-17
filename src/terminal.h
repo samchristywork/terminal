@@ -5,57 +5,57 @@ typedef struct {
   int red;
   int green;
   int blue;
-} RGB;
+} Term_RGB;
 
 typedef enum {
   COLOR_DEFAULT,
   COLOR_BRIGHT,
   COLOR_256,
   COLOR_RGB,
-} ColorType;
+} Term_ColorType;
 
 typedef struct {
-  ColorType type;
+  Term_ColorType type;
   union {
     int color;
-    RGB rgb;
+    Term_RGB rgb;
   };
-} Color;
+} Term_Color;
 
 typedef struct {
-  Color fg;
-  Color bg;
+  Term_Color fg;
+  Term_Color bg;
   int bold;
   int underline;
   int reverse;
-} Attr;
+} Term_Attr;
 
 typedef struct {
   int data[6];
   int length;
-  Attr attr;
-} Cell;
+  Term_Attr attr;
+} Term_Cell;
 
 typedef struct {
-  Cell *cells;
-} Line;
+  Term_Cell *cells;
+} Term_Line;
 
 typedef struct {
   int x;
   int y;
-  Attr attr;
-} Cursor;
+  Term_Attr attr;
+} Term_Cursor;
 
 typedef struct {
-  Cursor cursor;
-  Line *lines;
-} Screen;
+  Term_Cursor cursor;
+  Term_Line *lines;
+} Term_Screen;
 
 typedef struct {
   int width;
   int height;
-  Screen screen;
-  Screen alt_screen;
+  Term_Screen screen;
+  Term_Screen alt_screen;
   bool using_alt_screen;
 } Terminal;
 
@@ -75,19 +75,19 @@ typedef enum {
   TOKEN_MAIN_SCREEN,      // ESC[?1049l
   TOKEN_TAB,              // \t
   TOKEN_UNKNOWN,
-} TokenType;
+} Term_TokenType;
 
 typedef struct {
-  TokenType type;
+  Term_TokenType type;
   // TODO: handle longer sequences
   char value[256];
   int length;
-} Token;
+} Term_Token;
 
 typedef struct {
-  Token *tokens;
+  Term_Token *tokens;
   int count;
-} Tokens;
+} Term_Tokens;
 
 void print_terminal(Terminal *terminal);
 
