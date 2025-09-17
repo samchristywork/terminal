@@ -56,5 +56,21 @@ void init_colors(GuiContext *gui) {
   }
 }
 
+unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
+  if (color.type == COLOR_DEFAULT && color.color >= 30 && color.color <= 37) {
+    return gui->colors[color.color - 30];
+  } else if (color.type == COLOR_BRIGHT && color.color >= 90 &&
+             color.color <= 97) {
+    return gui->colors[color.color - 90 + 8];
+  } else if (color.type == COLOR_DEFAULT && color.color >= 40 &&
+             color.color <= 47) {
+    return gui->colors[color.color - 40];
+  } else if (color.type == COLOR_BRIGHT && color.color >= 100 &&
+             color.color <= 107) {
+    return gui->colors[color.color - 100 + 8];
+  }
+  return gui->white;
+}
+
 int main() {
 }
