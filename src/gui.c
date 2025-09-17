@@ -72,5 +72,47 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
   return gui->white;
 }
 
+void draw_terminal(GuiContext *gui, Terminal *terminal) {
+  Term_Screen *term_screen =
+      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+
+  for (int y = 0; y < terminal->height; y++) {
+    for (int x = 0; x < terminal->width; x++) {
+      Term_Cell cell = term_screen->lines[y].cells[x];
+
+      int pixel_x = x * gui->char_width + 10;
+      int pixel_y = y * gui->char_height + 10;
+
+      unsigned long bg_color = gui->black;
+      if (cell.attr.bg.color != 0) {
+        bg_color = get_color_pixel(gui, cell.attr.bg);
+      }
+
+      bool is_cursor =
+          (term_screen->cursor.x == x && term_screen->cursor.y == y);
+
+      XSetForeground(gui->display, gui->gc,
+                     (cell.attr.fg.color != 0)
+                         ? get_color_pixel(gui, cell.attr.fg)
+                         : gui->white);
+
+      XSetForeground(gui->display, gui->gc, bg_color);
+      XFillRectangle(gui->display, gui->window, gui->gc, pixel_x, pixel_y,
+                     gui->char_width, gui->char_height);
+
+      XSetForeground(gui->display, gui->gc,
+                     (cell.attr.fg.color != 0)
+                         ? get_color_pixel(gui, cell.attr.fg)
+                         : gui->white);
+
+      if (cell.length > 0) {
+        char ch = cell.data[0];
+        XDrawString(gui->display, gui->window, gui->gc, pixel_x,
+                    pixel_y + gui->char_ascent, &ch, 1);
+      }
+    }
+  }
+}
+
 int main() {
 }
