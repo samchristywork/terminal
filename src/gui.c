@@ -90,20 +90,36 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       bool is_cursor =
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
+      bool reverse = cell.attr.reverse || is_cursor;
 
-      XSetForeground(gui->display, gui->gc,
-                     (cell.attr.fg.color != 0)
-                         ? get_color_pixel(gui, cell.attr.fg)
-                         : gui->white);
+      if (reverse) {
+        unsigned long temp = bg_color;
+        bg_color = (cell.attr.fg.color != 0)
+                       ? get_color_pixel(gui, cell.attr.fg)
+                       : gui->white;
+        XSetForeground(gui->display, gui->gc, temp);
+      } else {
+        XSetForeground(gui->display, gui->gc,
+                       (cell.attr.fg.color != 0)
+                           ? get_color_pixel(gui, cell.attr.fg)
+                           : gui->white);
+      }
 
       XSetForeground(gui->display, gui->gc, bg_color);
       XFillRectangle(gui->display, gui->window, gui->gc, pixel_x, pixel_y,
                      gui->char_width, gui->char_height);
 
-      XSetForeground(gui->display, gui->gc,
-                     (cell.attr.fg.color != 0)
-                         ? get_color_pixel(gui, cell.attr.fg)
-                         : gui->white);
+      if (reverse) {
+        XSetForeground(gui->display, gui->gc,
+                       (cell.attr.fg.color != 0)
+                           ? get_color_pixel(gui, cell.attr.fg)
+                           : gui->white);
+      } else {
+        XSetForeground(gui->display, gui->gc,
+                       (cell.attr.fg.color != 0)
+                           ? get_color_pixel(gui, cell.attr.fg)
+                           : gui->white);
+      }
 
       if (cell.length > 0) {
         char ch = cell.data[0];
