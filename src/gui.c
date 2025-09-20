@@ -125,6 +125,13 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         char ch = cell.data[0];
         XDrawString(gui->display, gui->window, gui->gc, pixel_x,
                     pixel_y + gui->char_ascent, &ch, 1);
+
+        if (cell.attr.underline) {
+          XDrawLine(gui->display, gui->window, gui->gc, pixel_x,
+                    pixel_y + gui->char_height - 1,
+                    pixel_x + gui->char_width - 1,
+                    pixel_y + gui->char_height - 1);
+        }
       }
     }
   }
