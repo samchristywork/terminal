@@ -137,5 +137,21 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   }
 }
 
+void setup_sample_terminal(Terminal *terminal) {
+  init_terminal(terminal, 80, 24);
+
+  write_string(terminal, "\x1b[31mRed Text\x1b[0m Normal Text\n");
+  write_string(terminal,
+               "\x1b[1;34mBold Blue\x1b[0m \x1b[42mGreen Background\x1b[0m\n");
+  write_string(terminal, "\x1b[4;33mUnderlined Yellow\x1b[0m\n");
+  write_string(terminal, "\x1b[7mReverse Video\x1b[0m\n");
+  write_string(terminal, "\x1b[38;5;196m256-color Red\x1b[0m "
+                         "\x1b[48;5;46m256-color Green BG\x1b[0m\n");
+  write_string(terminal, "\nTab Test:\tCol1\tCol2\tCol3\n");
+  write_string(terminal,
+               "Line with \x1b[31mred\x1b[0m and \x1b[34mblue\x1b[0m words.\n");
+  write_string(terminal, "\nCursor will be at end of this line.");
+}
+
 int main() {
 }
