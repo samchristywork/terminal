@@ -153,5 +153,49 @@ void setup_sample_terminal(Terminal *terminal) {
   write_string(terminal, "\nCursor will be at end of this line.");
 }
 
+int init_gui(GuiContext *gui) {
+  gui->display = XOpenDisplay(NULL);
+  if (gui->display == NULL) {
+    fprintf(stderr, "Cannot open display\n");
+    return 1;
+  }
+
+  gui->screen = DefaultScreen(gui->display);
+  gui->black = BlackPixel(gui->display, gui->screen);
+  gui->white = WhitePixel(gui->display, gui->screen);
+
+  init_colors(gui);
+
+  gui->window =
+      XCreateSimpleWindow(gui->display, RootWindow(gui->display, gui->screen),
+                          100, 100, 800, 600, 1, gui->white, gui->black);
+
+  XSelectInput(gui->display, gui->window,
+               ExposureMask | KeyPressMask | ButtonPressMask);
+
+  XStoreName(gui->display, gui->window, "Terminal GUI");
+
+  gui->gc = XCreateGC(gui->display, gui->window, 0, NULL);
+  XSetForeground(gui->display, gui->gc, gui->white);
+  XSetBackground(gui->display, gui->gc, gui->black);
+
+  gui->font_info = XLoadQueryFont(gui->display, "fixed");
+  if (!gui->font_info) {
+    gui->font_info = XLoadQueryFont(gui->display, "*");
+    if (!gui->font_info) {
+      fprintf(stderr, "Cannot load any font\n");
+      XCloseDisplay(gui->display);
+      return 1;
+    }
+  }
+  XSetFont(gui->display, gui->gc, gui->font_info->fid);
+
+  gui->char_width = gui->font_info->max_bounds.width;
+  gui->char_height = gui->font_info->ascent + gui->font_info->descent;
+  gui->char_ascent = gui->font_info->ascent;
+
+  return 0;
+}
+
 int main() {
 }
