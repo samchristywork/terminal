@@ -197,5 +197,19 @@ int init_gui(GuiContext *gui) {
   return 0;
 }
 
+void handle_events(GuiContext *gui, Terminal *terminal, int *running,
+                   XEvent *event) {
+  switch (event->type) {
+  case Expose:
+    XClearWindow(gui->display, gui->window);
+    draw_terminal(gui, terminal);
+    break;
+  case KeyPress:
+  case ButtonPress:
+    *running = 0;
+    break;
+  }
+}
+
 int main() {
 }
