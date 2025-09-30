@@ -190,6 +190,22 @@ void init_shell(GuiContext *gui) {
   }
 }
 
+void setup_sample_terminal(Terminal *terminal) {
+  init_terminal(terminal, 80, 24);
+
+  write_string(terminal, "\x1b[31mRed Text\x1b[0m Normal Text\n");
+  write_string(terminal,
+               "\x1b[1;34mBold Blue\x1b[0m \x1b[42mGreen Background\x1b[0m\n");
+  write_string(terminal, "\x1b[4;33mUnderlined Yellow\x1b[0m\n");
+  write_string(terminal, "\x1b[7mReverse Video\x1b[0m\n");
+  write_string(terminal, "\x1b[38;5;196m256-color Red\x1b[0m "
+                         "\x1b[48;5;46m256-color Green BG\x1b[0m\n");
+  write_string(terminal, "\nTab Test:\tCol1\tCol2\tCol3\n");
+  write_string(terminal,
+               "Line with \x1b[31mred\x1b[0m and \x1b[34mblue\x1b[0m words.\n");
+  write_string(terminal, "\nCursor will be at end of this line.");
+}
+
 int init_gui(GuiContext *gui) {
   gui->display = XOpenDisplay(NULL);
   if (gui->display == NULL) {
@@ -234,10 +250,21 @@ int init_gui(GuiContext *gui) {
   return 0;
 }
 
+void read_shell_output(GuiContext *gui, Terminal *terminal) {
+  char buffer[4096];
+  ssize_t bytes_read;
+
+  while ((bytes_read = read(gui->pipe_fd, buffer, sizeof(buffer) - 1)) > 0) {
+    buffer[bytes_read] = '\0';
+    write_string(terminal, buffer);
+  }
+}
+
 void handle_events(GuiContext *gui, Terminal *terminal, int *running,
                    XEvent *event) {
   switch (event->type) {
   case Expose:
+    read_shell_output(gui, terminal);
     XClearWindow(gui->display, gui->window);
     draw_terminal(gui, terminal);
     break;
@@ -265,13 +292,24 @@ int main() {
     return 1;
   }
 
-  setup_sample_terminal_2(&terminal);
+  init_terminal(&terminal, 80, 24);
+  setup_sample_terminal(&terminal);
+  init_shell(&gui);
 
   XMapWindow(gui.display, gui.window);
 
   while (running) {
-    XNextEvent(gui.display, &event);
-    handle_events(&gui, &terminal, &running, &event);
+    while (XPending(gui.display)) {
+      XNextEvent(gui.display, &event);
+      handle_events(&gui, &terminal, &running, &event);
+    }
+
+    read_shell_output(&gui, &terminal);
+    XClearWindow(gui.display, gui.window);
+    draw_terminal(&gui, &terminal);
+    XFlush(gui.display);
+
+    usleep(10000);
   }
 
   cleanup_gui(&gui);
