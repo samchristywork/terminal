@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #include "terminal.h"
 
@@ -153,6 +155,50 @@ void setup_sample_terminal(Terminal *terminal) {
   write_string(terminal, "\nCursor will be at end of this line.");
 }
 
+void setup_sample_terminal_2(Terminal *terminal) {
+  init_terminal(terminal, 80, 24);
+
+  int pipe_fd[2];
+  pid_t pid;
+
+  if (pipe(pipe_fd) == -1) {
+    perror("pipe");
+    return;
+  }
+
+  pid = fork();
+  if (pid == -1) {
+    perror("fork");
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    return;
+  }
+
+  if (pid == 0) {
+    close(pipe_fd[0]);
+    dup2(pipe_fd[1], STDOUT_FILENO);
+    dup2(pipe_fd[1], STDERR_FILENO);
+    close(pipe_fd[1]);
+
+    execl("/bin/ls", "ls", "-l", "--color=always", (char *)NULL);
+    perror("execl");
+    exit(1);
+  } else {
+    close(pipe_fd[1]);
+
+    char buffer[4096];
+    ssize_t bytes_read;
+
+    while ((bytes_read = read(pipe_fd[0], buffer, sizeof(buffer) - 1)) > 0) {
+      buffer[bytes_read] = '\0';
+      write_string(terminal, buffer);
+    }
+
+    close(pipe_fd[0]);
+    waitpid(pid, NULL, 0);
+  }
+}
+
 int init_gui(GuiContext *gui) {
   gui->display = XOpenDisplay(NULL);
   if (gui->display == NULL) {
@@ -228,7 +274,7 @@ int main() {
     return 1;
   }
 
-  setup_sample_terminal(&terminal);
+  setup_sample_terminal_2(&terminal);
 
   XMapWindow(gui.display, gui.window);
 
