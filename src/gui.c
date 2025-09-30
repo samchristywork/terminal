@@ -211,5 +211,12 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
   }
 }
 
+void cleanup_gui(GuiContext *gui) {
+  XFreeGC(gui->display, gui->gc);
+  XUnloadFont(gui->display, gui->font_info->fid);
+  XDestroyWindow(gui->display, gui->window);
+  XCloseDisplay(gui->display);
+}
+
 int main() {
 }
