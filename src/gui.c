@@ -219,4 +219,23 @@ void cleanup_gui(GuiContext *gui) {
 }
 
 int main() {
+  GuiContext gui;
+  Terminal terminal;
+  XEvent event;
+  int running = 1;
+
+  if (init_gui(&gui) != 0) {
+    return 1;
+  }
+
+  setup_sample_terminal(&terminal);
+
+  XMapWindow(gui.display, gui.window);
+
+  while (running) {
+    XNextEvent(gui.display, &event);
+    handle_events(&gui, &terminal, &running, &event);
+  }
+
+  cleanup_gui(&gui);
 }
