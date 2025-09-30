@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #include "terminal.h"
 
@@ -19,6 +20,9 @@ typedef struct {
   unsigned long colors[16];
   int char_width, char_height;
   int char_ascent;
+  int pipe_fd;
+  int input_fd;
+  pid_t child_pid;
 } GuiContext;
 
 void init_colors(GuiContext *gui) {
@@ -139,29 +143,12 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   }
 }
 
-void setup_sample_terminal(Terminal *terminal) {
-  init_terminal(terminal, 80, 24);
-
-  write_string(terminal, "\x1b[31mRed Text\x1b[0m Normal Text\n");
-  write_string(terminal,
-               "\x1b[1;34mBold Blue\x1b[0m \x1b[42mGreen Background\x1b[0m\n");
-  write_string(terminal, "\x1b[4;33mUnderlined Yellow\x1b[0m\n");
-  write_string(terminal, "\x1b[7mReverse Video\x1b[0m\n");
-  write_string(terminal, "\x1b[38;5;196m256-color Red\x1b[0m "
-                         "\x1b[48;5;46m256-color Green BG\x1b[0m\n");
-  write_string(terminal, "\nTab Test:\tCol1\tCol2\tCol3\n");
-  write_string(terminal,
-               "Line with \x1b[31mred\x1b[0m and \x1b[34mblue\x1b[0m words.\n");
-  write_string(terminal, "\nCursor will be at end of this line.");
-}
-
-void setup_sample_terminal_2(Terminal *terminal) {
-  init_terminal(terminal, 80, 24);
-
-  int pipe_fd[2];
+void init_shell(GuiContext *gui) {
+  int output_pipe[2];
+  int input_pipe[2];
   pid_t pid;
 
-  if (pipe(pipe_fd) == -1) {
+  if (pipe(output_pipe) == -1 || pipe(input_pipe) == -1) {
     perror("pipe");
     return;
   }
@@ -169,33 +156,37 @@ void setup_sample_terminal_2(Terminal *terminal) {
   pid = fork();
   if (pid == -1) {
     perror("fork");
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
+    close(output_pipe[0]);
+    close(output_pipe[1]);
+    close(input_pipe[0]);
+    close(input_pipe[1]);
     return;
   }
 
   if (pid == 0) {
-    close(pipe_fd[0]);
-    dup2(pipe_fd[1], STDOUT_FILENO);
-    dup2(pipe_fd[1], STDERR_FILENO);
-    close(pipe_fd[1]);
+    close(output_pipe[0]);
+    close(input_pipe[1]);
 
-    execl("/bin/ls", "ls", "-l", "--color=always", (char *)NULL);
+    dup2(input_pipe[0], STDIN_FILENO);
+    dup2(output_pipe[1], STDOUT_FILENO);
+    dup2(output_pipe[1], STDERR_FILENO);
+
+    close(input_pipe[0]);
+    close(output_pipe[1]);
+
+    execl("/bin/sh", "sh", "-i", (char *)NULL);
     perror("execl");
     exit(1);
   } else {
-    close(pipe_fd[1]);
+    close(output_pipe[1]);
+    close(input_pipe[0]);
 
-    char buffer[4096];
-    ssize_t bytes_read;
+    int flags = fcntl(output_pipe[0], F_GETFL, 0);
+    fcntl(output_pipe[0], F_SETFL, flags | O_NONBLOCK);
 
-    while ((bytes_read = read(pipe_fd[0], buffer, sizeof(buffer) - 1)) > 0) {
-      buffer[bytes_read] = '\0';
-      write_string(terminal, buffer);
-    }
-
-    close(pipe_fd[0]);
-    waitpid(pid, NULL, 0);
+    gui->pipe_fd = output_pipe[0];
+    gui->input_fd = input_pipe[1];
+    gui->child_pid = pid;
   }
 }
 
