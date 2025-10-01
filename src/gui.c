@@ -23,6 +23,8 @@ typedef struct {
   int pipe_fd;
   int input_fd;
   pid_t child_pid;
+  Pixmap backbuffer;
+  int window_width, window_height;
 } GuiContext;
 
 void init_colors(GuiContext *gui) {
@@ -82,6 +84,10 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
 
+  XSetForeground(gui->display, gui->gc, gui->black);
+  XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, 0,
+                 gui->window_width, gui->window_height);
+
   for (int y = 0; y < terminal->height; y++) {
     for (int x = 0; x < terminal->width; x++) {
       Term_Cell cell = term_screen->lines[y].cells[x];
@@ -112,7 +118,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       }
 
       XSetForeground(gui->display, gui->gc, bg_color);
-      XFillRectangle(gui->display, gui->window, gui->gc, pixel_x, pixel_y,
+      XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x, pixel_y,
                      gui->char_width, gui->char_height);
 
       if (reverse) {
@@ -129,11 +135,11 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       if (cell.length > 0) {
         char ch = cell.data[0];
-        XDrawString(gui->display, gui->window, gui->gc, pixel_x,
+        XDrawString(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_ascent, &ch, 1);
 
         if (cell.attr.underline) {
-          XDrawLine(gui->display, gui->window, gui->gc, pixel_x,
+          XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_height - 1,
                     pixel_x + gui->char_width - 1,
                     pixel_y + gui->char_height - 1);
@@ -141,6 +147,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       }
     }
   }
+
+  XCopyArea(gui->display, gui->backbuffer, gui->window, gui->gc, 0, 0,
+            gui->window_width, gui->window_height, 0, 0);
 }
 
 void init_shell(GuiContext *gui) {
@@ -219,9 +228,11 @@ int init_gui(GuiContext *gui) {
 
   init_colors(gui);
 
+  gui->window_width = 800;
+  gui->window_height = 600;
   gui->window =
       XCreateSimpleWindow(gui->display, RootWindow(gui->display, gui->screen),
-                          100, 100, 800, 600, 1, gui->white, gui->black);
+                          100, 100, gui->window_width, gui->window_height, 1, gui->white, gui->black);
 
   XSelectInput(gui->display, gui->window,
                ExposureMask | KeyPressMask | ButtonPressMask);
@@ -247,6 +258,10 @@ int init_gui(GuiContext *gui) {
   gui->char_height = gui->font_info->ascent + gui->font_info->descent;
   gui->char_ascent = gui->font_info->ascent;
 
+  gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
+                                  gui->window_height,
+                                  DefaultDepth(gui->display, gui->screen));
+
   return 0;
 }
 
@@ -265,7 +280,6 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
   switch (event->type) {
   case Expose:
     read_shell_output(gui, terminal);
-    XClearWindow(gui->display, gui->window);
     draw_terminal(gui, terminal);
     break;
   case KeyPress: {
@@ -295,6 +309,7 @@ void cleanup_gui(GuiContext *gui) {
     kill(gui->child_pid, SIGTERM);
     waitpid(gui->child_pid, NULL, 0);
   }
+  XFreePixmap(gui->display, gui->backbuffer);
   XFreeGC(gui->display, gui->gc);
   XUnloadFont(gui->display, gui->font_info->fid);
   XDestroyWindow(gui->display, gui->window);
@@ -331,7 +346,6 @@ int main() {
     }
 
     read_shell_output(&gui, &terminal);
-    XClearWindow(gui.display, gui.window);
     draw_terminal(&gui, &terminal);
     XFlush(gui.display);
 
