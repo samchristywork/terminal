@@ -268,7 +268,16 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     XClearWindow(gui->display, gui->window);
     draw_terminal(gui, terminal);
     break;
-  case KeyPress:
+  case KeyPress: {
+    char buffer[32];
+    KeySym keysym;
+    int len = XLookupString(&event->xkey, buffer, sizeof(buffer), &keysym, NULL);
+
+    if (len > 0) {
+      write(gui->input_fd, buffer, len);
+    }
+    break;
+  }
   case ButtonPress:
     *running = 0;
     break;
