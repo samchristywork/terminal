@@ -323,6 +323,13 @@ int main() {
       handle_events(&gui, &terminal, &running, &event);
     }
 
+    int status;
+    pid_t result = waitpid(gui.child_pid, &status, WNOHANG);
+    if (result != 0) {
+      running = 0;
+      break;
+    }
+
     read_shell_output(&gui, &terminal);
     XClearWindow(gui.display, gui.window);
     draw_terminal(&gui, &terminal);
