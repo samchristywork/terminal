@@ -285,6 +285,16 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
 }
 
 void cleanup_gui(GuiContext *gui) {
+  if (gui->pipe_fd >= 0) {
+    close(gui->pipe_fd);
+  }
+  if (gui->input_fd >= 0) {
+    close(gui->input_fd);
+  }
+  if (gui->child_pid > 0) {
+    kill(gui->child_pid, SIGTERM);
+    waitpid(gui->child_pid, NULL, 0);
+  }
   XFreeGC(gui->display, gui->gc);
   XUnloadFont(gui->display, gui->font_info->fid);
   XDestroyWindow(gui->display, gui->window);
