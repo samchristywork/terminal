@@ -302,6 +302,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       if (term_rows < 1) term_rows = 1;
 
       resize_terminal(terminal, term_cols, term_rows);
+      draw_terminal(gui, terminal);
     }
     break;
   }

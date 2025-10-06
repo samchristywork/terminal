@@ -526,6 +526,14 @@ void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_w
 }
 
 void resize_terminal(Terminal *terminal, int new_width, int new_height) {
+  if (new_width <= 0 || new_height <= 0) {
+    return;
+  }
+
+  if (terminal->width == new_width && terminal->height == new_height) {
+    return;
+  }
+
   int old_width = terminal->width;
   int old_height = terminal->height;
 
