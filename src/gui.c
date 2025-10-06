@@ -235,7 +235,7 @@ int init_gui(GuiContext *gui) {
                           100, 100, gui->window_width, gui->window_height, 1, gui->white, gui->black);
 
   XSelectInput(gui->display, gui->window,
-               ExposureMask | KeyPressMask | ButtonPressMask);
+               ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask);
 
   XStoreName(gui->display, gui->window, "Terminal GUI");
 
