@@ -95,4 +95,6 @@ void init_terminal(Terminal *terminal, int width, int height);
 
 void write_string(Terminal *terminal, const char *str);
 
+void resize_terminal(Terminal *terminal, int new_width, int new_height);
+
 #endif

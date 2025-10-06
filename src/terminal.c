@@ -524,3 +524,14 @@ void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_w
     screen->cursor.y = new_height - 1;
   }
 }
+
+void resize_terminal(Terminal *terminal, int new_width, int new_height) {
+  int old_width = terminal->width;
+  int old_height = terminal->height;
+
+  resize_screen(&terminal->screen, old_width, old_height, new_width, new_height);
+  resize_screen(&terminal->alt_screen, old_width, old_height, new_width, new_height);
+
+  terminal->width = new_width;
+  terminal->height = new_height;
+}
