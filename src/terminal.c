@@ -490,3 +490,37 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 void write_string(Terminal *terminal, const char *str) {
   write_terminal(terminal, str, strlen(str));
 }
+
+void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
+  Term_Line *new_lines = (Term_Line *)malloc(new_height * sizeof(Term_Line));
+
+  for (int i = 0; i < new_height; i++) {
+    new_lines[i].cells = (Term_Cell *)malloc(new_width * sizeof(Term_Cell));
+    for (int j = 0; j < new_width; j++) {
+      bzero(&new_lines[i].cells[j], sizeof(Term_Cell));
+    }
+  }
+
+  int copy_height = (old_height < new_height) ? old_height : new_height;
+  int copy_width = (old_width < new_width) ? old_width : new_width;
+
+  for (int i = 0; i < copy_height; i++) {
+    for (int j = 0; j < copy_width; j++) {
+      new_lines[i].cells[j] = screen->lines[i].cells[j];
+    }
+  }
+
+  for (int i = 0; i < old_height; i++) {
+    free(screen->lines[i].cells);
+  }
+  free(screen->lines);
+
+  screen->lines = new_lines;
+
+  if (screen->cursor.x >= new_width) {
+    screen->cursor.x = new_width - 1;
+  }
+  if (screen->cursor.y >= new_height) {
+    screen->cursor.y = new_height - 1;
+  }
+}
