@@ -282,6 +282,29 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     read_shell_output(gui, terminal);
     draw_terminal(gui, terminal);
     break;
+  case ConfigureNotify: {
+    int new_width = event->xconfigure.width;
+    int new_height = event->xconfigure.height;
+
+    if (new_width != gui->window_width || new_height != gui->window_height) {
+      gui->window_width = new_width;
+      gui->window_height = new_height;
+
+      XFreePixmap(gui->display, gui->backbuffer);
+      gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
+                                      gui->window_height,
+                                      DefaultDepth(gui->display, gui->screen));
+
+      int term_cols = (new_width - 20) / gui->char_width;
+      int term_rows = (new_height - 20) / gui->char_height;
+
+      if (term_cols < 1) term_cols = 1;
+      if (term_rows < 1) term_rows = 1;
+
+      resize_terminal(terminal, term_cols, term_rows);
+    }
+    break;
+  }
   case KeyPress: {
     char buffer[32];
     KeySym keysym;
