@@ -311,7 +311,10 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     KeySym keysym;
     int len = XLookupString(&event->xkey, buffer, sizeof(buffer), &keysym, NULL);
 
-    if (len > 0) {
+    if (keysym == XK_BackSpace) {
+      buffer[0] = 0x7f;
+      write(gui->input_fd, buffer, 1);
+    } else if (len > 0) {
       write(gui->input_fd, buffer, len);
     }
     break;
