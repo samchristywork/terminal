@@ -179,6 +179,9 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_NEWLINE, text, i, len);
     } else if (matches(text, length, i, "\r", &len)) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);
+    } else if (matches(text, length, i, "\b", &len) ||
+               (i < length && (unsigned char)text[i] == 0x7f)) {
+      add_token(tokens, TOKEN_BACKSPACE, text, i, 1);
     } else if (matches(text, length, i, "\x1b[J", &len)) {
       add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
     } else if (matches(text, length, i, "\x1b[0J", &len)) {
@@ -209,7 +212,8 @@ Term_Tokens *tokenize(const char *text, int length) {
       len = 1;
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' &&
-             text[i] != '\x1b' && text[i] != '\t') {
+             text[i] != '\x1b' && text[i] != '\t' && text[i] != '\b' &&
+             (unsigned char)text[i] != 0x7f) {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
@@ -482,6 +486,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         handle_newline(screen, width, height);
       } else {
         cursor->x = next_tab_stop;
+      }
+    } else if (token.type == TOKEN_BACKSPACE) {
+      if (cursor->x > 0) {
+        cursor->x--;
       }
     }
   }

@@ -74,6 +74,7 @@ typedef enum {
   TOKEN_ALT_SCREEN,       // ESC[?1049h
   TOKEN_MAIN_SCREEN,      // ESC[?1049l
   TOKEN_TAB,              // \t
+  TOKEN_BACKSPACE,        // \b or 0x7f
   TOKEN_UNKNOWN,
 } Term_TokenType;
 
