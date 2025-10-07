@@ -208,12 +208,15 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\t", &len)) {
       add_token(tokens, TOKEN_TAB, text, i, len);
+    } else if (text[i] == '\x07') {
+      // Bell character - ignore
+      len = 1;
     } else {
       len = 1;
       int start = i;
       while (i < length && text[i] != '\n' && text[i] != '\r' &&
              text[i] != '\x1b' && text[i] != '\t' && text[i] != '\b' &&
-             (unsigned char)text[i] != 0x7f) {
+             (unsigned char)text[i] != 0x7f && text[i] != '\x07') {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
@@ -490,6 +493,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_BACKSPACE) {
       if (cursor->x > 0) {
         cursor->x--;
+        bzero(&screen->lines[cursor->y].cells[cursor->x], sizeof(Term_Cell));
       }
     }
   }
