@@ -314,6 +314,14 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     if (keysym == XK_BackSpace) {
       buffer[0] = 0x7f;
       write(gui->input_fd, buffer, 1);
+    } else if (keysym == XK_Up) {
+      write(gui->input_fd, "\x1b[A", 3);
+    } else if (keysym == XK_Down) {
+      write(gui->input_fd, "\x1b[B", 3);
+    } else if (keysym == XK_Right) {
+      write(gui->input_fd, "\x1b[C", 3);
+    } else if (keysym == XK_Left) {
+      write(gui->input_fd, "\x1b[D", 3);
     } else {
       int len = XLookupString(&event->xkey, buffer, sizeof(buffer), NULL, NULL);
       if (len > 0) {
