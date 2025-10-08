@@ -9,6 +9,7 @@
 #include <fcntl.h>
 
 #include "terminal.h"
+#include "args.h"
 
 typedef struct {
   Display *display;
@@ -354,7 +355,10 @@ void cleanup_gui(GuiContext *gui) {
   XCloseDisplay(gui->display);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  Args args;
+  parse_args(argc, argv, &args);
+
   GuiContext gui;
   Terminal terminal;
   XEvent event;
