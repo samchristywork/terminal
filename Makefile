@@ -9,8 +9,8 @@ build/test: build/test.o build/terminal.o
 build/example: build/example.o build/terminal.o
 	${CC} build/*.o -o $@
 
-build/gui: build/gui.o build/terminal.o
-	${CC} build/*.o -o $@ -lX11
+build/gui: build/gui.o build/terminal.o build/args.o
+	${CC} build/gui.o build/terminal.o build/args.o -o $@ -lX11
 
 build/%.o: src/%.c
 	mkdir -p build
