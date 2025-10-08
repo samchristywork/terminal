@@ -1,5 +1,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xft/Xft.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +16,11 @@ typedef struct {
   Display *display;
   Window window;
   GC gc;
-  XFontStruct *font_info;
+  XftFont *font;
+  XftDraw *xft_draw;
+  XftColor xft_colors[16];
+  XftColor xft_white;
+  XftColor xft_black;
   int screen;
   unsigned long black, white;
   unsigned long colors[16];
@@ -31,6 +36,8 @@ typedef struct {
 void init_colors(GuiContext *gui) {
   Colormap colormap = DefaultColormap(gui->display, gui->screen);
   XColor color;
+  XRenderColor xrender_color;
+  Visual *visual = DefaultVisual(gui->display, gui->screen);
 
   unsigned long color_values[] = {
       0x000000, // black
@@ -62,7 +69,25 @@ void init_colors(GuiContext *gui) {
     } else {
       gui->colors[i] = (i < 8) ? gui->black : gui->white;
     }
+
+    xrender_color.red = color.red;
+    xrender_color.green = color.green;
+    xrender_color.blue = color.blue;
+    xrender_color.alpha = 0xffff;
+    XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_colors[i]);
   }
+
+  xrender_color.red = 0xffff;
+  xrender_color.green = 0xffff;
+  xrender_color.blue = 0xffff;
+  xrender_color.alpha = 0xffff;
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_white);
+
+  xrender_color.red = 0;
+  xrender_color.green = 0;
+  xrender_color.blue = 0;
+  xrender_color.alpha = 0xffff;
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_black);
 }
 
 unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
