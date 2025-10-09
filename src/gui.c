@@ -264,7 +264,6 @@ void setup_sample_terminal(Terminal *terminal) {
   write_string(terminal, "\nTab Test:\tCol1\tCol2\tCol3\n");
   write_string(terminal,
                "Line with \x1b[31mred\x1b[0m and \x1b[34mblue\x1b[0m words.\n");
-  write_string(terminal, "\nCursor will be at end of this line.");
 }
 
 int init_gui(GuiContext *gui, int font_size) {
