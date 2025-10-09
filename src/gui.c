@@ -267,7 +267,7 @@ void setup_sample_terminal(Terminal *terminal) {
   write_string(terminal, "\nCursor will be at end of this line.");
 }
 
-int init_gui(GuiContext *gui) {
+int init_gui(GuiContext *gui, int font_size) {
   gui->display = XOpenDisplay(NULL);
   if (gui->display == NULL) {
     fprintf(stderr, "Cannot open display\n");
@@ -295,9 +295,12 @@ int init_gui(GuiContext *gui) {
   XSetForeground(gui->display, gui->gc, gui->white);
   XSetBackground(gui->display, gui->gc, gui->black);
 
-  gui->font = XftFontOpenName(gui->display, gui->screen, "FreeMono:file=assets/FreeMono.otf:size=12");
+  char font_pattern[256];
+  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=assets/FreeMono.otf:size=%d", font_size);
+  gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
   if (!gui->font) {
-    gui->font = XftFontOpenName(gui->display, gui->screen, "mono-12");
+    snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
+    gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       fprintf(stderr, "Cannot load FreeMono font or fallback\n");
       XCloseDisplay(gui->display);
@@ -433,7 +436,7 @@ int main(int argc, char *argv[]) {
   XEvent event;
   int running = 1;
 
-  if (init_gui(&gui) != 0) {
+  if (init_gui(&gui, args.font_size) != 0) {
     return 1;
   }
 
