@@ -295,24 +295,27 @@ int init_gui(GuiContext *gui) {
   XSetForeground(gui->display, gui->gc, gui->white);
   XSetBackground(gui->display, gui->gc, gui->black);
 
-  gui->font_info = XLoadQueryFont(gui->display, "fixed");
-  if (!gui->font_info) {
-    gui->font_info = XLoadQueryFont(gui->display, "*");
-    if (!gui->font_info) {
-      fprintf(stderr, "Cannot load any font\n");
+  gui->font = XftFontOpenName(gui->display, gui->screen, "FreeMono:file=assets/FreeMono.otf:size=12");
+  if (!gui->font) {
+    gui->font = XftFontOpenName(gui->display, gui->screen, "mono-12");
+    if (!gui->font) {
+      fprintf(stderr, "Cannot load FreeMono font or fallback\n");
       XCloseDisplay(gui->display);
       return 1;
     }
   }
-  XSetFont(gui->display, gui->gc, gui->font_info->fid);
 
-  gui->char_width = gui->font_info->max_bounds.width;
-  gui->char_height = gui->font_info->ascent + gui->font_info->descent;
-  gui->char_ascent = gui->font_info->ascent;
+  gui->char_width = gui->font->max_advance_width;
+  gui->char_height = gui->font->ascent + gui->font->descent;
+  gui->char_ascent = gui->font->ascent;
 
   gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
                                   gui->window_height,
                                   DefaultDepth(gui->display, gui->screen));
+
+  gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer,
+                                DefaultVisual(gui->display, gui->screen),
+                                DefaultColormap(gui->display, gui->screen));
 
   return 0;
 }
