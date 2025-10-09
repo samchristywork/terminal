@@ -350,6 +350,11 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
                                       gui->window_height,
                                       DefaultDepth(gui->display, gui->screen));
 
+      XftDrawDestroy(gui->xft_draw);
+      gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer,
+                                    DefaultVisual(gui->display, gui->screen),
+                                    DefaultColormap(gui->display, gui->screen));
+
       int term_cols = (new_width - 20) / gui->char_width;
       int term_rows = (new_height - 20) / gui->char_height;
 
@@ -402,9 +407,19 @@ void cleanup_gui(GuiContext *gui) {
     kill(gui->child_pid, SIGTERM);
     waitpid(gui->child_pid, NULL, 0);
   }
+
+  Colormap colormap = DefaultColormap(gui->display, gui->screen);
+  Visual *visual = DefaultVisual(gui->display, gui->screen);
+  for (int i = 0; i < 16; i++) {
+    XftColorFree(gui->display, visual, colormap, &gui->xft_colors[i]);
+  }
+  XftColorFree(gui->display, visual, colormap, &gui->xft_white);
+  XftColorFree(gui->display, visual, colormap, &gui->xft_black);
+
+  XftDrawDestroy(gui->xft_draw);
+  XftFontClose(gui->display, gui->font);
   XFreePixmap(gui->display, gui->backbuffer);
   XFreeGC(gui->display, gui->gc);
-  XUnloadFont(gui->display, gui->font_info->fid);
   XDestroyWindow(gui->display, gui->window);
   XCloseDisplay(gui->display);
 }
