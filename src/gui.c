@@ -177,10 +177,20 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       if (cell.length > 0) {
         char ch = cell.data[0];
-        XDrawString(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                    pixel_y + gui->char_ascent, &ch, 1);
+        XftColor *fg_color;
+
+        if (reverse) {
+          fg_color = (cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
+        } else {
+          fg_color = (cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
+        }
+
+        XftDrawString8(gui->xft_draw, fg_color, gui->font, pixel_x,
+                      pixel_y + gui->char_ascent, (FcChar8*)&ch, 1);
 
         if (cell.attr.underline) {
+          XSetForeground(gui->display, gui->gc,
+                        (cell.attr.fg.color != 0) ? get_color_pixel(gui, cell.attr.fg) : gui->white);
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_height - 1,
                     pixel_x + gui->char_width - 1,
