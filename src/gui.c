@@ -180,7 +180,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XftColor *fg_color;
 
         if (reverse) {
-          fg_color = (cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
+          fg_color = (cell.attr.bg.color != 0) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_black;
         } else {
           fg_color = (cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
         }
