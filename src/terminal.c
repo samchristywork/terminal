@@ -220,10 +220,8 @@ Term_Tokens *tokenize(const char *text, int length) {
         i++;
       }
       add_token(tokens, TOKEN_TEXT, text, start, i - start);
-      i--;
-      if (i <= start) {
-        i++;
-      }
+      len = i - start;
+      i = start;
     }
     i += len - 1;
   }
