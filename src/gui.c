@@ -135,31 +135,40 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
              color.color <= 107) {
     return &gui->xft_colors[color.color - 100 + 8];
   } else if (color.type == COLOR_256) {
-    static XftColor xft_color_256;
-    XRenderColor xrender_color;
+    static XftColor xft_color_cache[256];
+    static bool xft_color_cached[256] = {false};
     int idx = color.color;
-    unsigned long r, g, b;
 
-    if (idx < 16) {
-      return &gui->xft_colors[idx];
-    } else if (idx < 232) {
-      idx -= 16;
-      r = (idx / 36) * 51;
-      g = ((idx / 6) % 6) * 51;
-      b = (idx % 6) * 51;
-    } else {
-      int gray = 8 + (idx - 232) * 10;
-      r = g = b = gray;
+    if (idx >= 0 && idx < 256) {
+      if (idx < 16) {
+        return &gui->xft_colors[idx];
+      }
+
+      if (!xft_color_cached[idx]) {
+        XRenderColor xrender_color;
+        unsigned long r, g, b;
+
+        if (idx < 232) {
+          int cube_idx = idx - 16;
+          r = (cube_idx / 36) * 51;
+          g = ((cube_idx / 6) % 6) * 51;
+          b = (cube_idx % 6) * 51;
+        } else {
+          int gray = 8 + (idx - 232) * 10;
+          r = g = b = gray;
+        }
+
+        xrender_color.red = r << 8;
+        xrender_color.green = g << 8;
+        xrender_color.blue = b << 8;
+        xrender_color.alpha = 0xffff;
+        XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
+                           DefaultColormap(gui->display, gui->screen),
+                           &xrender_color, &xft_color_cache[idx]);
+        xft_color_cached[idx] = true;
+      }
+      return &xft_color_cache[idx];
     }
-
-    xrender_color.red = r << 8;
-    xrender_color.green = g << 8;
-    xrender_color.blue = b << 8;
-    xrender_color.alpha = 0xffff;
-    XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
-                       DefaultColormap(gui->display, gui->screen),
-                       &xrender_color, &xft_color_256);
-    return &xft_color_256;
   }
   return &gui->xft_white;
 }
@@ -488,6 +497,24 @@ int main(int argc, char *argv[]) {
   XMapWindow(gui.display, gui.window);
 
   while (running) {
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(gui.pipe_fd, &read_fds);
+    int x11_fd = ConnectionNumber(gui.display);
+    FD_SET(x11_fd, &read_fds);
+    int max_fd = (gui.pipe_fd > x11_fd) ? gui.pipe_fd : x11_fd;
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 50000;
+
+    int activity = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
+
+    if (activity < 0) {
+      perror("select");
+      break;
+    }
+
     while (XPending(gui.display)) {
       XNextEvent(gui.display, &event);
       handle_events(&gui, &terminal, &running, &event);
@@ -500,11 +527,11 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    read_shell_output(&gui, &terminal);
-    draw_terminal(&gui, &terminal);
-    XFlush(gui.display);
-
-    usleep(10000);
+    if (FD_ISSET(gui.pipe_fd, &read_fds)) {
+      read_shell_output(&gui, &terminal);
+      draw_terminal(&gui, &terminal);
+      XFlush(gui.display);
+    }
   }
 
   cleanup_gui(&gui);
