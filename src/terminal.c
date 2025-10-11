@@ -419,7 +419,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
 #ifdef DEBUG
   for (int i = 0; i < tokens->count; i++) {
-    Token token = tokens->tokens[i];
+    Term_Token token = tokens->tokens[i];
     print_token(token);
   }
 #endif
