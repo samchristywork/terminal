@@ -102,6 +102,22 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
   } else if (color.type == COLOR_BRIGHT && color.color >= 100 &&
              color.color <= 107) {
     return gui->colors[color.color - 100 + 8];
+  } else if (color.type == COLOR_256) {
+    int idx = color.color;
+    unsigned long r, g, b;
+
+    if (idx < 16) {
+      return gui->colors[idx];
+    } else if (idx < 232) {
+      idx -= 16;
+      r = (idx / 36) * 51;
+      g = ((idx / 6) % 6) * 51;
+      b = (idx % 6) * 51;
+      return (r << 16) | (g << 8) | b;
+    } else {
+      int gray = 8 + (idx - 232) * 10;
+      return (gray << 16) | (gray << 8) | gray;
+    }
   }
   return gui->white;
 }
@@ -118,6 +134,32 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
   } else if (color.type == COLOR_BRIGHT && color.color >= 100 &&
              color.color <= 107) {
     return &gui->xft_colors[color.color - 100 + 8];
+  } else if (color.type == COLOR_256) {
+    static XftColor xft_color_256;
+    XRenderColor xrender_color;
+    int idx = color.color;
+    unsigned long r, g, b;
+
+    if (idx < 16) {
+      return &gui->xft_colors[idx];
+    } else if (idx < 232) {
+      idx -= 16;
+      r = (idx / 36) * 51;
+      g = ((idx / 6) % 6) * 51;
+      b = (idx % 6) * 51;
+    } else {
+      int gray = 8 + (idx - 232) * 10;
+      r = g = b = gray;
+    }
+
+    xrender_color.red = r << 8;
+    xrender_color.green = g << 8;
+    xrender_color.blue = b << 8;
+    xrender_color.alpha = 0xffff;
+    XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
+                       DefaultColormap(gui->display, gui->screen),
+                       &xrender_color, &xft_color_256);
+    return &xft_color_256;
   }
   return &gui->xft_white;
 }
