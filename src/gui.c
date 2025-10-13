@@ -12,6 +12,8 @@
 #include "terminal.h"
 #include "args.h"
 
+#define LINE_GAP 2
+
 typedef struct {
   Display *display;
   Window window;
@@ -187,7 +189,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       Term_Cell cell = term_screen->lines[y].cells[x];
 
       int pixel_x = x * gui->char_width + 10;
-      int pixel_y = y * gui->char_height + 10;
+      int pixel_y = y * (gui->char_height + LINE_GAP) + 10;
 
       unsigned long bg_color = gui->black;
       if (cell.attr.bg.color != 0) {
@@ -425,7 +427,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
                                     DefaultColormap(gui->display, gui->screen));
 
       int term_cols = (new_width - 20) / gui->char_width;
-      int term_rows = (new_height - 20) / gui->char_height;
+      int term_rows = (new_height - 20) / (gui->char_height + LINE_GAP);
 
       if (term_cols < 1) term_cols = 1;
       if (term_rows < 1) term_rows = 1;
