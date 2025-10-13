@@ -17,6 +17,7 @@ typedef struct {
   Window window;
   GC gc;
   XftFont *font;
+  XftFont *font_bold;
   XftDraw *xft_draw;
   XftColor xft_colors[16];
   XftColor xft_white;
@@ -229,6 +230,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       if (cell.length > 0) {
         char ch = cell.data[0];
         XftColor *fg_color;
+        XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
 
         if (reverse) {
           fg_color = (cell.attr.bg.color != 0) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_black;
@@ -236,7 +238,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           fg_color = (cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
         }
 
-        XftDrawString8(gui->xft_draw, fg_color, gui->font, pixel_x,
+        XftDrawString8(gui->xft_draw, fg_color, font_to_use, pixel_x,
                       pixel_y + gui->char_ascent, (FcChar8*)&ch, 1);
 
         if (cell.attr.underline) {
@@ -346,7 +348,10 @@ int init_gui(GuiContext *gui, int font_size) {
   XSetBackground(gui->display, gui->gc, gui->black);
 
   char font_pattern[256];
-  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=assets/FreeMono.otf:size=%d", font_size);
+  char cwd[512];
+  getcwd(cwd, sizeof(cwd));
+
+  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", cwd, font_size);
   gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
   if (!gui->font) {
     snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
@@ -355,6 +360,17 @@ int init_gui(GuiContext *gui, int font_size) {
       fprintf(stderr, "Cannot load FreeMono font or fallback\n");
       XCloseDisplay(gui->display);
       return 1;
+    }
+  }
+
+  snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", cwd, font_size);
+  gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
+
+  if (!gui->font_bold) {
+    snprintf(font_pattern, sizeof(font_pattern), "mono:weight=bold:size=%d", font_size);
+    gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
+    if (!gui->font_bold) {
+      gui->font_bold = gui->font;
     }
   }
 
@@ -471,6 +487,9 @@ void cleanup_gui(GuiContext *gui) {
 
   XftDrawDestroy(gui->xft_draw);
   XftFontClose(gui->display, gui->font);
+  if (gui->font_bold != gui->font) {
+    XftFontClose(gui->display, gui->font_bold);
+  }
   XFreePixmap(gui->display, gui->backbuffer);
   XFreeGC(gui->display, gui->gc);
   XDestroyWindow(gui->display, gui->window);
