@@ -296,15 +296,6 @@ bool ends_with(const char *str, int length, char suffix) {
 }
 
 void modify_cursor(Term_Cursor **cursor, Term_Token token) {
-  for (int i = 0; i < token.length; i++) {
-    if (isprint(token.value[i])) {
-      printf("%c", token.value[i]);
-    } else {
-      printf("\\x%02x", (unsigned char)token.value[i]);
-    }
-  }
-  printf("\n");
-
   if (starts_with(token.value, token.length, "\x1b[38;5;")) {
     if (token.length < 8) {
       return;
