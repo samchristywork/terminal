@@ -8,11 +8,13 @@ void print_usage(const char *program_name) {
   fprintf(stderr, "Usage: %s [OPTIONS]\n", program_name);
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "  --font-size SIZE    Set font size (default: 14)\n");
+  fprintf(stderr, "  --log-file FILE     Write logs to FILE instead of stdout\n");
   fprintf(stderr, "  --help              Show this help message\n");
 }
 
 void parse_args(int argc, char *argv[], Args *args) {
   args->font_size = 14;
+  args->log_file = NULL;
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--font-size") == 0) {
@@ -26,6 +28,13 @@ void parse_args(int argc, char *argv[], Args *args) {
         fprintf(stderr, "Error: font size must be positive\n");
         exit(1);
       }
+    } else if (strcmp(argv[i], "--log-file") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --log-file requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      args->log_file = argv[++i];
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage(argv[0]);
       exit(0);
