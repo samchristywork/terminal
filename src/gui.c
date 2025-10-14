@@ -11,6 +11,7 @@
 
 #include "terminal.h"
 #include "args.h"
+#include "log.h"
 
 #define LINE_GAP 2
 
@@ -502,12 +503,21 @@ int main(int argc, char *argv[]) {
   Args args;
   parse_args(argc, argv, &args);
 
+  if (args.log_file != NULL) {
+    log_set_file(args.log_file);
+    LOG_INFO_MSG("Logging to file: %s", args.log_file);
+  } else {
+    log_init(stdout);
+    LOG_INFO_MSG("Logging to stdout");
+  }
+
   GuiContext gui;
   Terminal terminal;
   XEvent event;
   int running = 1;
 
   if (init_gui(&gui, args.font_size) != 0) {
+    log_close();
     return 1;
   }
 
@@ -556,4 +566,5 @@ int main(int argc, char *argv[]) {
   }
 
   cleanup_gui(&gui);
+  log_close();
 }
