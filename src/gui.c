@@ -265,14 +265,18 @@ void init_shell(GuiContext *gui) {
   int input_pipe[2];
   pid_t pid;
 
+  LOG_INFO_MSG("Initializing shell subprocess");
+
   if (pipe(output_pipe) == -1 || pipe(input_pipe) == -1) {
     perror("pipe");
+    LOG_ERROR_MSG("Failed to create pipes for shell subprocess");
     return;
   }
 
   pid = fork();
   if (pid == -1) {
     perror("fork");
+    LOG_ERROR_MSG("Failed to fork shell subprocess");
     close(output_pipe[0]);
     close(output_pipe[1]);
     close(input_pipe[0]);
@@ -304,6 +308,7 @@ void init_shell(GuiContext *gui) {
     gui->pipe_fd = output_pipe[0];
     gui->input_fd = input_pipe[1];
     gui->child_pid = pid;
+    LOG_INFO_MSG("Shell subprocess started with PID %d", pid);
   }
 }
 
@@ -323,9 +328,12 @@ void setup_sample_terminal(Terminal *terminal) {
 }
 
 int init_gui(GuiContext *gui, int font_size) {
+  LOG_INFO_MSG("Initializing GUI with font size %d", font_size);
+
   gui->display = XOpenDisplay(NULL);
   if (gui->display == NULL) {
     fprintf(stderr, "Cannot open display\n");
+    LOG_ERROR_MSG("Cannot open X11 display");
     return 1;
   }
 
@@ -357,14 +365,17 @@ int init_gui(GuiContext *gui, int font_size) {
   snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", cwd, font_size);
   gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
   if (!gui->font) {
+    LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
     snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       fprintf(stderr, "Cannot load FreeMono font or fallback\n");
+      LOG_ERROR_MSG("Cannot load any suitable font");
       XCloseDisplay(gui->display);
       return 1;
     }
   }
+  LOG_INFO_MSG("Loaded font: %s", font_pattern);
 
   snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", cwd, font_size);
   gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
@@ -414,6 +425,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     int new_height = event->xconfigure.height;
 
     if (new_width != gui->window_width || new_height != gui->window_height) {
+      LOG_DEBUG_MSG("Window resized to %dx%d", new_width, new_height);
       gui->window_width = new_width;
       gui->window_height = new_height;
 
@@ -433,6 +445,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       if (term_cols < 1) term_cols = 1;
       if (term_rows < 1) term_rows = 1;
 
+      LOG_DEBUG_MSG("Terminal resized to %dx%d", term_cols, term_rows);
       resize_terminal(terminal, term_cols, term_rows);
       draw_terminal(gui, terminal);
     }
@@ -469,6 +482,8 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
 }
 
 void cleanup_gui(GuiContext *gui) {
+  LOG_INFO_MSG("Cleaning up GUI resources");
+
   if (gui->pipe_fd >= 0) {
     close(gui->pipe_fd);
   }
@@ -476,6 +491,7 @@ void cleanup_gui(GuiContext *gui) {
     close(gui->input_fd);
   }
   if (gui->child_pid > 0) {
+    LOG_INFO_MSG("Terminating shell subprocess PID %d", gui->child_pid);
     kill(gui->child_pid, SIGTERM);
     waitpid(gui->child_pid, NULL, 0);
   }
@@ -566,5 +582,6 @@ int main(int argc, char *argv[]) {
   }
 
   cleanup_gui(&gui);
+  LOG_INFO_MSG("GUI application terminated");
   log_close();
 }
