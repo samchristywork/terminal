@@ -486,6 +486,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       }
     }
   }
+
+  free(tokens->tokens);
+  free(tokens);
 }
 
 void write_string(Terminal *terminal, const char *str) {
