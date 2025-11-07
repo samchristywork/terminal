@@ -135,6 +135,7 @@ void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
     tokens->tokens = (Term_Token *)realloc(
         tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
   }
+  if (length > 255) length = 255;
   Term_Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
   token->length = length;
@@ -218,8 +219,9 @@ Term_Tokens *tokenize(const char *text, int length) {
              (unsigned char)text[i] != 0x7f && text[i] != '\x07') {
         i++;
       }
-      add_token(tokens, TOKEN_TEXT, text, start, i - start);
       len = i - start;
+      for (int k = 0; k < len; k += 255)
+        add_token(tokens, TOKEN_TEXT, text, start + k, len - k < 255 ? len - k : 255);
       i = start;
     }
     i += len - 1;
@@ -232,6 +234,7 @@ void write_regular_char(Term_Screen *screen, char c, int width, int height,
                         Term_Attr attr) {
   if (screen->cursor.x >= width) {
     handle_newline(screen, width, height);
+    screen->cursor.x = 0;
   }
 
   if (screen->cursor.y < height) {
