@@ -31,7 +31,7 @@ typedef struct {
 } Term_Attr;
 
 typedef struct {
-  int data[6];
+  char data[6];
   int length;
   Term_Attr attr;
 } Term_Cell;
