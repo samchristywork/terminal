@@ -122,7 +122,6 @@ void scroll_terminal(Terminal *terminal) {
 }
 
 void handle_newline(Term_Screen *screen, int width, int height) {
-  screen->cursor.x = 0;
   screen->cursor.y++;
   if (screen->cursor.y >= height) {
     screen->cursor.y = height - 1;
