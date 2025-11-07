@@ -1,6 +1,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include <stdbool.h>
+
 typedef struct {
   int red;
   int green;
