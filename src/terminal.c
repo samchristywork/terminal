@@ -146,10 +146,12 @@ void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
 bool is_csi_code(const char *text, int length, int index, int *code_length) {
   if (index + 2 < length && text[index] == '\x1b' && text[index + 1] == '[') {
     int i = index + 2;
-    while (i < length && (isdigit(text[i]) || text[i] == ';')) {
+    while (i < length && (unsigned char)text[i] >= 0x30 &&
+           (unsigned char)text[i] <= 0x3f) {
       i++;
     }
-    if (i < length && (text[i] == 'm' || text[i] == 'H' || text[i] == 'f')) {
+    if (i < length && (unsigned char)text[i] >= 0x40 &&
+        (unsigned char)text[i] <= 0x7e) {
       *code_length = i - index + 1;
       return true;
     }
@@ -200,12 +202,12 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_ERASE_SOL, text, i, len);
     } else if (matches(text, length, i, "\x1b[2K", &len)) {
       add_token(tokens, TOKEN_ERASE_LINE, text, i, len);
-    } else if (is_csi_code(text, length, i, &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
       add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
+    } else if (is_csi_code(text, length, i, &len)) {
+      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\t", &len)) {
       add_token(tokens, TOKEN_TAB, text, i, len);
     } else if (text[i] == '\x07') {
