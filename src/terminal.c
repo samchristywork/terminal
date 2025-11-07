@@ -212,16 +212,19 @@ Term_Tokens *tokenize(const char *text, int length) {
       // Bell character - ignore
       len = 1;
     } else {
-      len = 1;
       int start = i;
-      while (i < length && text[i] != '\n' && text[i] != '\r' &&
-             text[i] != '\x1b' && text[i] != '\t' && text[i] != '\b' &&
-             (unsigned char)text[i] != 0x7f && text[i] != '\x07') {
+      while (i < length && (unsigned char)text[i] >= 0x20 &&
+             (unsigned char)text[i] < 0x7f) {
         i++;
       }
       len = i - start;
-      for (int k = 0; k < len; k += 255)
-        add_token(tokens, TOKEN_TEXT, text, start + k, len - k < 255 ? len - k : 255);
+      if (len > 0) {
+        for (int k = 0; k < len; k += 255)
+          add_token(tokens, TOKEN_TEXT, text, start + k,
+                    len - k < 255 ? len - k : 255);
+      } else {
+        len = 1; // skip unrecognised byte; prevent i from decrementing
+      }
       i = start;
     }
     i += len - 1;
