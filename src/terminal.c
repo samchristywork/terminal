@@ -373,7 +373,7 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
 
     char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
     memcpy(token_copy, token.value, token.length);
-    token_copy[token.length] = '\0';
+    token_copy[token.length - 1] = '\0'; // strip terminator ('H' or 'f')
 
     char *part = strtok(token_copy + 2, ";");
     if (part != NULL) {
