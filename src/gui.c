@@ -523,8 +523,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  init_terminal(&terminal, 80, 24);
-  setup_sample_terminal(&terminal);
+  int term_cols = (gui.window_width - 20) / gui.char_width;
+  int term_rows = (gui.window_height - 20) / (gui.char_height + LINE_GAP);
+  if (term_cols < 1) term_cols = 1;
+  if (term_rows < 1) term_rows = 1;
+  init_terminal(&terminal, term_cols, term_rows);
   init_shell(&gui);
 
   XMapWindow(gui.display, gui.window);
