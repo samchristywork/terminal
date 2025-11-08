@@ -94,6 +94,18 @@ void init_screen(Term_Screen *screen, int width, int height) {
   }
 }
 
+void free_screen(Term_Screen *screen, int height) {
+  for (int i = 0; i < height; i++) {
+    free(screen->lines[i].cells);
+  }
+  free(screen->lines);
+}
+
+void free_terminal(Terminal *terminal) {
+  free_screen(&terminal->screen, terminal->height);
+  free_screen(&terminal->alt_screen, terminal->height);
+}
+
 void init_terminal(Terminal *terminal, int width, int height) {
   terminal->width = width;
   terminal->height = height;

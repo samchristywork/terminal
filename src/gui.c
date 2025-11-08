@@ -569,6 +569,7 @@ int main(int argc, char *argv[]) {
   }
 
   cleanup_gui(&gui);
+  free_terminal(&terminal);
   LOG_INFO_MSG("GUI application terminated");
   log_close();
 }
