@@ -201,34 +201,21 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       bool reverse = cell.attr.reverse || is_cursor;
 
+      unsigned long text_color;
       if (reverse) {
-        unsigned long temp = bg_color;
+        text_color = bg_color;
         bg_color = (cell.attr.fg.color != 0)
                        ? get_color_pixel(gui, cell.attr.fg)
                        : gui->white;
-        XSetForeground(gui->display, gui->gc, temp);
       } else {
-        XSetForeground(gui->display, gui->gc,
-                       (cell.attr.fg.color != 0)
-                           ? get_color_pixel(gui, cell.attr.fg)
-                           : gui->white);
+        text_color = (cell.attr.fg.color != 0)
+                         ? get_color_pixel(gui, cell.attr.fg)
+                         : gui->white;
       }
 
       XSetForeground(gui->display, gui->gc, bg_color);
       XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x, pixel_y,
                      gui->char_width, gui->char_height);
-
-      if (reverse) {
-        XSetForeground(gui->display, gui->gc,
-                       (cell.attr.fg.color != 0)
-                           ? get_color_pixel(gui, cell.attr.fg)
-                           : gui->white);
-      } else {
-        XSetForeground(gui->display, gui->gc,
-                       (cell.attr.fg.color != 0)
-                           ? get_color_pixel(gui, cell.attr.fg)
-                           : gui->white);
-      }
 
       if (cell.length > 0) {
         char ch = cell.data[0];
@@ -245,8 +232,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
                       pixel_y + gui->char_ascent, (FcChar8*)&ch, 1);
 
         if (cell.attr.underline) {
-          XSetForeground(gui->display, gui->gc,
-                        (cell.attr.fg.color != 0) ? get_color_pixel(gui, cell.attr.fg) : gui->white);
+          XSetForeground(gui->display, gui->gc, text_color);
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_height - 1,
                     pixel_x + gui->char_width - 1,
