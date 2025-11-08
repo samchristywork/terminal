@@ -391,9 +391,8 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
   char buffer[4096];
   ssize_t bytes_read;
 
-  while ((bytes_read = read(gui->pipe_fd, buffer, sizeof(buffer) - 1)) > 0) {
-    buffer[bytes_read] = '\0';
-    write_string(terminal, buffer);
+  while ((bytes_read = read(gui->pipe_fd, buffer, sizeof(buffer))) > 0) {
+    write_terminal(terminal, buffer, bytes_read);
   }
 }
 
