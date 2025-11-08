@@ -459,9 +459,6 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     }
     break;
   }
-  case ButtonPress:
-    *running = 0;
-    break;
   }
 }
 
