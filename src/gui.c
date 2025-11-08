@@ -330,10 +330,23 @@ int init_gui(GuiContext *gui, int font_size) {
   XSetBackground(gui->display, gui->gc, gui->black);
 
   char font_pattern[256];
-  char cwd[512];
-  getcwd(cwd, sizeof(cwd));
+  char exe_path[512];
+  char exe_dir[512];
+  ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+  if (len != -1) {
+    exe_path[len] = '\0';
+    char *slash = strrchr(exe_path, '/');
+    if (slash) {
+      *slash = '\0';
+      snprintf(exe_dir, sizeof(exe_dir), "%s", exe_path);
+    } else {
+      snprintf(exe_dir, sizeof(exe_dir), ".");
+    }
+  } else {
+    snprintf(exe_dir, sizeof(exe_dir), ".");
+  }
 
-  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", cwd, font_size);
+  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", exe_dir, font_size);
   gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
   if (!gui->font) {
     LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
@@ -348,7 +361,7 @@ int init_gui(GuiContext *gui, int font_size) {
   }
   LOG_INFO_MSG("Loaded font: %s", font_pattern);
 
-  snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", cwd, font_size);
+  snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", exe_dir, font_size);
   gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
 
   if (!gui->font_bold) {
