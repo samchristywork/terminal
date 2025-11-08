@@ -84,12 +84,12 @@ void print_terminal(Terminal *terminal) {
 }
 
 void init_screen(Term_Screen *screen, int width, int height) {
-  bzero(&screen->cursor, sizeof(Term_Cursor));
+  memset(&screen->cursor, 0, sizeof(Term_Cursor));
   screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
   for (int i = 0; i < height; i++) {
     screen->lines[i].cells = (Term_Cell *)malloc(width * sizeof(Term_Cell));
     for (int j = 0; j < width; j++) {
-      bzero(&screen->lines[i].cells[j], sizeof(Term_Cell));
+      memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
     }
   }
 }
@@ -121,7 +121,7 @@ void scroll_screen(Term_Screen *screen, int width, int height) {
     }
   }
   for (int k = 0; k < width; k++) {
-    bzero(&screen->lines[height - 1].cells[k], sizeof(Term_Cell));
+    memset(&screen->lines[height - 1].cells[k], 0, sizeof(Term_Cell));
   }
 }
 
@@ -452,15 +452,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       modify_cursor(&cursor, token);
     } else if (token.type == TOKEN_ERASE_EOL) {
       for (int j = cursor->x; j < width; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
+        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_SOL) {
       for (int j = 0; j <= cursor->x; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
+        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_LINE) {
       for (int j = 0; j < width; j++) {
-        bzero(&screen->lines[cursor->y].cells[j], sizeof(Term_Cell));
+        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_ERASE_DOWN) {
       for (int j = cursor->y; j < height; j++) {
@@ -468,7 +468,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           if (j == cursor->y && k < cursor->x) {
             continue;
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
+          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_UP) {
@@ -477,13 +477,13 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           if (j == cursor->y && k > cursor->x) {
             continue;
           }
-          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
+          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_ALL) {
       for (int j = 0; j < height; j++) {
         for (int k = 0; k < width; k++) {
-          bzero(&screen->lines[j].cells[k], sizeof(Term_Cell));
+          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
         }
       }
     } else if (token.type == TOKEN_ERASE_SCROLLBACK) {
@@ -501,7 +501,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_BACKSPACE) {
       if (cursor->x > 0) {
         cursor->x--;
-        bzero(&screen->lines[cursor->y].cells[cursor->x], sizeof(Term_Cell));
+        memset(&screen->lines[cursor->y].cells[cursor->x], 0, sizeof(Term_Cell));
       }
     }
   }
@@ -520,7 +520,7 @@ void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_w
   for (int i = 0; i < new_height; i++) {
     new_lines[i].cells = (Term_Cell *)malloc(new_width * sizeof(Term_Cell));
     for (int j = 0; j < new_width; j++) {
-      bzero(&new_lines[i].cells[j], sizeof(Term_Cell));
+      memset(&new_lines[i].cells[j], 0, sizeof(Term_Cell));
     }
   }
 
