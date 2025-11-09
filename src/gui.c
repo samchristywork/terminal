@@ -1,5 +1,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/Xft/Xft.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -37,6 +38,15 @@ typedef struct {
   pid_t child_pid;
   Pixmap backbuffer;
   int window_width, window_height;
+  Atom atom_clipboard;
+  Atom atom_utf8_string;
+  Atom atom_xsel_data;
+  bool selecting;
+  bool has_selection;
+  int sel_anchor_x, sel_anchor_y;
+  int sel_cur_x, sel_cur_y;
+  char *selection_text;
+  int selection_len;
 } GuiContext;
 
 void init_colors(GuiContext *gui) {
@@ -179,6 +189,71 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
   return &gui->xft_white;
 }
 
+static bool cell_in_selection(GuiContext *gui, int x, int y) {
+  if (!gui->has_selection) return false;
+  int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
+  int bx = gui->sel_cur_x,    by = gui->sel_cur_y;
+  int start_x, start_y, end_x, end_y;
+  if (ay < by || (ay == by && ax <= bx)) {
+    start_x = ax; start_y = ay; end_x = bx; end_y = by;
+  } else {
+    start_x = bx; start_y = by; end_x = ax; end_y = ay;
+  }
+  if (y < start_y || y > end_y) return false;
+  if (y == start_y && x < start_x) return false;
+  if (y == end_y && x > end_x) return false;
+  return true;
+}
+
+static void build_selection_text(GuiContext *gui, Terminal *terminal) {
+  free(gui->selection_text);
+  gui->selection_text = NULL;
+  gui->selection_len = 0;
+  if (!gui->has_selection) return;
+
+  int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
+  int bx = gui->sel_cur_x,    by = gui->sel_cur_y;
+  int start_x, start_y, end_x, end_y;
+  if (ay < by || (ay == by && ax <= bx)) {
+    start_x = ax; start_y = ay; end_x = bx; end_y = by;
+  } else {
+    start_x = bx; start_y = by; end_x = ax; end_y = ay;
+  }
+
+  Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+  Term_Scrollback *sb = &scr->scrollback;
+  int scroll_offset = scr->scroll_offset;
+
+  int max_len = (terminal->width + 1) * (end_y - start_y + 1) + 1;
+  char *buf = malloc(max_len);
+  if (!buf) return;
+  int pos = 0;
+
+  for (int y = start_y; y <= end_y; y++) {
+    int x0 = (y == start_y) ? start_x : 0;
+    int x1 = (y == end_y)   ? end_x   : terminal->width - 1;
+
+    for (int x = x0; x <= x1; x++) {
+      Term_Cell cell;
+      int combined = sb->count - scroll_offset + y;
+      if (combined < 0) {
+        memset(&cell, 0, sizeof(Term_Cell));
+      } else if (combined < sb->count) {
+        int idx = (sb->head + combined) % sb->capacity;
+        cell = (x < sb->widths[idx]) ? sb->lines[idx][x] : (Term_Cell){0};
+      } else {
+        cell = scr->lines[combined - sb->count].cells[x];
+      }
+      buf[pos++] = (cell.length > 0) ? cell.data[0] : ' ';
+    }
+    if (y < end_y) buf[pos++] = '\n';
+  }
+
+  buf[pos] = '\0';
+  gui->selection_text = buf;
+  gui->selection_len = pos;
+}
+
 void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
@@ -213,7 +288,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       bool is_cursor = (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
-      bool reverse = cell.attr.reverse || is_cursor;
+      bool in_selection = cell_in_selection(gui, x, y);
+      bool reverse = cell.attr.reverse || is_cursor || in_selection;
 
       unsigned long text_color;
       if (reverse) {
@@ -331,6 +407,14 @@ int init_gui(GuiContext *gui, int font_size) {
   gui->black = BlackPixel(gui->display, gui->screen);
   gui->white = WhitePixel(gui->display, gui->screen);
 
+  gui->atom_clipboard = XInternAtom(gui->display, "CLIPBOARD", False);
+  gui->atom_utf8_string = XInternAtom(gui->display, "UTF8_STRING", False);
+  gui->atom_xsel_data = XInternAtom(gui->display, "XSEL_DATA", False);
+  gui->selecting = false;
+  gui->has_selection = false;
+  gui->selection_text = NULL;
+  gui->selection_len = 0;
+
   init_colors(gui);
 
   gui->window_width = 800;
@@ -340,7 +424,8 @@ int init_gui(GuiContext *gui, int font_size) {
                           100, 100, gui->window_width, gui->window_height, 1, gui->white, gui->black);
 
   XSelectInput(gui->display, gui->window,
-               ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask);
+               ExposureMask | KeyPressMask | ButtonPressMask | ButtonReleaseMask |
+               Button1MotionMask | StructureNotifyMask);
 
   XStoreName(gui->display, gui->window, "Terminal GUI");
 
@@ -480,6 +565,12 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       scr->scroll_offset -= terminal->height;
       if (scr->scroll_offset < 0) scr->scroll_offset = 0;
       draw_terminal(gui, terminal);
+    } else if (keysym == XK_c && (event->xkey.state & ControlMask) && (event->xkey.state & ShiftMask)) {
+      if (gui->has_selection)
+        XSetSelectionOwner(gui->display, gui->atom_clipboard, gui->window, CurrentTime);
+    } else if (keysym == XK_v && (event->xkey.state & ControlMask) && (event->xkey.state & ShiftMask)) {
+      XConvertSelection(gui->display, gui->atom_clipboard, gui->atom_utf8_string,
+                        gui->atom_xsel_data, gui->window, CurrentTime);
     } else if (keysym == XK_BackSpace) {
       buffer[0] = 0x7f;
       write(gui->pipe_fd, buffer, 1);
@@ -503,7 +594,24 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     Term_Screen *scr = terminal->using_alt_screen
                            ? &terminal->alt_screen : &terminal->screen;
     int max_scroll = scr->scrollback.count;
-    if (event->xbutton.button == Button4) {
+    if (event->xbutton.button == Button1) {
+      int cell_x = (event->xbutton.x - 10) / gui->char_width;
+      int cell_y = (event->xbutton.y - 10) / (gui->char_height + LINE_GAP);
+      if (cell_x < 0) cell_x = 0;
+      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+      if (cell_y < 0) cell_y = 0;
+      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+      gui->selecting = true;
+      gui->has_selection = false;
+      gui->sel_anchor_x = cell_x;
+      gui->sel_anchor_y = cell_y;
+      gui->sel_cur_x = cell_x;
+      gui->sel_cur_y = cell_y;
+      draw_terminal(gui, terminal);
+    } else if (event->xbutton.button == Button2) {
+      XConvertSelection(gui->display, XA_PRIMARY, gui->atom_utf8_string,
+                        gui->atom_xsel_data, gui->window, CurrentTime);
+    } else if (event->xbutton.button == Button4) {
       scr->scroll_offset += 3;
       if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
       draw_terminal(gui, terminal);
@@ -511,6 +619,78 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       scr->scroll_offset -= 3;
       if (scr->scroll_offset < 0) scr->scroll_offset = 0;
       draw_terminal(gui, terminal);
+    }
+    break;
+  }
+  case ButtonRelease: {
+    if (event->xbutton.button == Button1 && gui->selecting) {
+      int cell_x = (event->xbutton.x - 10) / gui->char_width;
+      int cell_y = (event->xbutton.y - 10) / (gui->char_height + LINE_GAP);
+      if (cell_x < 0) cell_x = 0;
+      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+      if (cell_y < 0) cell_y = 0;
+      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+      gui->sel_cur_x = cell_x;
+      gui->sel_cur_y = cell_y;
+      gui->selecting = false;
+      gui->has_selection = (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cell_y);
+      if (gui->has_selection) {
+        build_selection_text(gui, terminal);
+        XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+      }
+      draw_terminal(gui, terminal);
+    }
+    break;
+  }
+  case MotionNotify: {
+    if (gui->selecting) {
+      int cell_x = (event->xmotion.x - 10) / gui->char_width;
+      int cell_y = (event->xmotion.y - 10) / (gui->char_height + LINE_GAP);
+      if (cell_x < 0) cell_x = 0;
+      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+      if (cell_y < 0) cell_y = 0;
+      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+      gui->sel_cur_x = cell_x;
+      gui->sel_cur_y = cell_y;
+      gui->has_selection = true;
+      build_selection_text(gui, terminal);
+      draw_terminal(gui, terminal);
+    }
+    break;
+  }
+  case SelectionRequest: {
+    XSelectionRequestEvent *req = &event->xselectionrequest;
+    XSelectionEvent reply;
+    memset(&reply, 0, sizeof(reply));
+    reply.type = SelectionNotify;
+    reply.display = req->display;
+    reply.requestor = req->requestor;
+    reply.selection = req->selection;
+    reply.target = req->target;
+    reply.property = None;
+    reply.time = req->time;
+    if (gui->has_selection && gui->selection_text &&
+        (req->target == gui->atom_utf8_string || req->target == XA_STRING)) {
+      XChangeProperty(req->display, req->requestor, req->property,
+                      req->target, 8, PropModeReplace,
+                      (unsigned char *)gui->selection_text, gui->selection_len);
+      reply.property = req->property;
+    }
+    XSendEvent(req->display, req->requestor, False, 0, (XEvent *)&reply);
+    break;
+  }
+  case SelectionNotify: {
+    if (event->xselection.property == None) break;
+    Atom actual_type;
+    int actual_format;
+    unsigned long nitems, bytes_after;
+    unsigned char *data = NULL;
+    XGetWindowProperty(gui->display, gui->window, gui->atom_xsel_data,
+                       0, 65536, True, AnyPropertyType,
+                       &actual_type, &actual_format, &nitems, &bytes_after, &data);
+    if (data) {
+      write(gui->pipe_fd, data, nitems);
+      XFree(data);
     }
     break;
   }
@@ -539,6 +719,8 @@ void cleanup_gui(GuiContext *gui) {
   }
   XftColorFree(gui->display, visual, colormap, &gui->xft_white);
   XftColorFree(gui->display, visual, colormap, &gui->xft_black);
+
+  free(gui->selection_text);
 
   XftDrawDestroy(gui->xft_draw);
   XftFontClose(gui->display, gui->font);
