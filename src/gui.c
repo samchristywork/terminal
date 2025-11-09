@@ -437,6 +437,16 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
 
       LOG_DEBUG_MSG("Terminal resized to %dx%d", term_cols, term_rows);
       resize_terminal(terminal, term_cols, term_rows);
+
+      struct winsize ws = {
+        .ws_row = term_rows,
+        .ws_col = term_cols,
+        .ws_xpixel = 0,
+        .ws_ypixel = 0,
+      };
+      ioctl(gui->pipe_fd, TIOCSWINSZ, &ws);
+      kill(gui->child_pid, SIGWINCH);
+
       draw_terminal(gui, terminal);
     }
     break;
