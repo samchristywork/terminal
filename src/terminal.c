@@ -30,6 +30,12 @@ void print_cell_color(Term_Attr attr) {
   if (attr.bg.type == COLOR_256) {
     printf("\x1b[48;5;%dm", attr.bg.color);
   }
+  if (attr.fg.type == COLOR_RGB) {
+    printf("\x1b[38;2;%d;%d;%dm", attr.fg.rgb.red, attr.fg.rgb.green, attr.fg.rgb.blue);
+  }
+  if (attr.bg.type == COLOR_RGB) {
+    printf("\x1b[48;2;%d;%d;%dm", attr.bg.rgb.red, attr.bg.rgb.green, attr.bg.rgb.blue);
+  }
   if (attr.bold) {
     printf("\x1b[1m");
   }
@@ -378,6 +384,32 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
 
     (*cursor)->attr.bg.type = COLOR_256;
     (*cursor)->attr.bg.color = num;
+  } else if (starts_with(token.value, token.length, "\x1b[38;2;")) {
+    char params[32];
+    int params_len = token.length - 8;
+    if (params_len <= 0 || params_len >= (int)sizeof(params)) return;
+    memcpy(params, &token.value[7], params_len);
+    params[params_len] = '\0';
+    int r, g, b;
+    if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
+      (*cursor)->attr.fg.type = COLOR_RGB;
+      (*cursor)->attr.fg.rgb.red   = r < 0 ? 0 : (r > 255 ? 255 : r);
+      (*cursor)->attr.fg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
+      (*cursor)->attr.fg.rgb.blue  = b < 0 ? 0 : (b > 255 ? 255 : b);
+    }
+  } else if (starts_with(token.value, token.length, "\x1b[48;2;")) {
+    char params[32];
+    int params_len = token.length - 8;
+    if (params_len <= 0 || params_len >= (int)sizeof(params)) return;
+    memcpy(params, &token.value[7], params_len);
+    params[params_len] = '\0';
+    int r, g, b;
+    if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
+      (*cursor)->attr.bg.type = COLOR_RGB;
+      (*cursor)->attr.bg.rgb.red   = r < 0 ? 0 : (r > 255 ? 255 : r);
+      (*cursor)->attr.bg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
+      (*cursor)->attr.bg.rgb.blue  = b < 0 ? 0 : (b > 255 ? 255 : b);
+    }
   } else if (ends_with(token.value, token.length, 'm')) {
     if (token.length < 3) {
       return;
