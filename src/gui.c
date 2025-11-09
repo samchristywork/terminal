@@ -7,7 +7,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
+#include <pty.h>
 
 #include "terminal.h"
 #include "args.h"
@@ -246,16 +248,22 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
             gui->window_width, gui->window_height, 0, 0);
 }
 
-void init_shell(GuiContext *gui) {
-  int output_pipe[2];
-  int input_pipe[2];
+void init_shell(GuiContext *gui, int cols, int rows) {
+  int master, slave;
   pid_t pid;
 
   LOG_INFO_MSG("Initializing shell subprocess");
 
-  if (pipe(output_pipe) == -1 || pipe(input_pipe) == -1) {
-    perror("pipe");
-    LOG_ERROR_MSG("Failed to create pipes for shell subprocess");
+  struct winsize ws = {
+    .ws_row = rows,
+    .ws_col = cols,
+    .ws_xpixel = 0,
+    .ws_ypixel = 0,
+  };
+
+  if (openpty(&master, &slave, NULL, NULL, &ws) == -1) {
+    perror("openpty");
+    LOG_ERROR_MSG("Failed to open PTY");
     return;
   }
 
@@ -263,36 +271,35 @@ void init_shell(GuiContext *gui) {
   if (pid == -1) {
     perror("fork");
     LOG_ERROR_MSG("Failed to fork shell subprocess");
-    close(output_pipe[0]);
-    close(output_pipe[1]);
-    close(input_pipe[0]);
-    close(input_pipe[1]);
+    close(master);
+    close(slave);
     return;
   }
 
   if (pid == 0) {
-    close(output_pipe[0]);
-    close(input_pipe[1]);
+    close(master);
 
-    dup2(input_pipe[0], STDIN_FILENO);
-    dup2(output_pipe[1], STDOUT_FILENO);
-    dup2(output_pipe[1], STDERR_FILENO);
+    setsid();
+    ioctl(slave, TIOCSCTTY, 0);
 
-    close(input_pipe[0]);
-    close(output_pipe[1]);
+    dup2(slave, STDIN_FILENO);
+    dup2(slave, STDOUT_FILENO);
+    dup2(slave, STDERR_FILENO);
 
-    execl("/bin/sh", "sh", "-i", (char *)NULL);
+    if (slave > STDERR_FILENO)
+      close(slave);
+
+    execl("/bin/sh", "sh", NULL);
     perror("execl");
     exit(1);
   } else {
-    close(output_pipe[1]);
-    close(input_pipe[0]);
+    close(slave);
 
-    int flags = fcntl(output_pipe[0], F_GETFL, 0);
-    fcntl(output_pipe[0], F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(master, F_GETFL, 0);
+    fcntl(master, F_SETFL, flags | O_NONBLOCK);
 
-    gui->pipe_fd = output_pipe[0];
-    gui->input_fd = input_pipe[1];
+    gui->pipe_fd = master;
+    gui->input_fd = -1;
     gui->child_pid = pid;
     LOG_INFO_MSG("Shell subprocess started with PID %d", pid);
   }
@@ -441,19 +448,19 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
 
     if (keysym == XK_BackSpace) {
       buffer[0] = 0x7f;
-      write(gui->input_fd, buffer, 1);
+      write(gui->pipe_fd, buffer, 1);
     } else if (keysym == XK_Up) {
-      write(gui->input_fd, "\x1b[A", 3);
+      write(gui->pipe_fd, "\x1b[A", 3);
     } else if (keysym == XK_Down) {
-      write(gui->input_fd, "\x1b[B", 3);
+      write(gui->pipe_fd, "\x1b[B", 3);
     } else if (keysym == XK_Right) {
-      write(gui->input_fd, "\x1b[C", 3);
+      write(gui->pipe_fd, "\x1b[C", 3);
     } else if (keysym == XK_Left) {
-      write(gui->input_fd, "\x1b[D", 3);
+      write(gui->pipe_fd, "\x1b[D", 3);
     } else {
       int len = XLookupString(&event->xkey, buffer, sizeof(buffer), NULL, NULL);
       if (len > 0) {
-        write(gui->input_fd, buffer, len);
+        write(gui->pipe_fd, buffer, len);
       }
     }
     break;
@@ -522,7 +529,7 @@ int main(int argc, char *argv[]) {
   if (term_cols < 1) term_cols = 1;
   if (term_rows < 1) term_rows = 1;
   init_terminal(&terminal, term_cols, term_rows);
-  init_shell(&gui);
+  init_shell(&gui, term_cols, term_rows);
 
   XMapWindow(gui.display, gui.window);
 
