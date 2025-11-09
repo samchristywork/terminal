@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define SCROLLBACK_LINES 1000
+
 typedef struct {
   int red;
   int green;
@@ -49,8 +51,18 @@ typedef struct {
 } Term_Cursor;
 
 typedef struct {
+  Term_Cell **lines;
+  int *widths;
+  int capacity;
+  int count;
+  int head;
+} Term_Scrollback;
+
+typedef struct {
   Term_Cursor cursor;
   Term_Line *lines;
+  Term_Scrollback scrollback;
+  int scroll_offset;
 } Term_Screen;
 
 typedef struct {

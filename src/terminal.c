@@ -92,6 +92,12 @@ void init_screen(Term_Screen *screen, int width, int height) {
       memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
     }
   }
+  screen->scrollback.lines = malloc(SCROLLBACK_LINES * sizeof(Term_Cell *));
+  screen->scrollback.widths = malloc(SCROLLBACK_LINES * sizeof(int));
+  screen->scrollback.capacity = SCROLLBACK_LINES;
+  screen->scrollback.count = 0;
+  screen->scrollback.head = 0;
+  screen->scroll_offset = 0;
 }
 
 void free_screen(Term_Screen *screen, int height) {
@@ -99,6 +105,11 @@ void free_screen(Term_Screen *screen, int height) {
     free(screen->lines[i].cells);
   }
   free(screen->lines);
+  for (int i = 0; i < screen->scrollback.count; i++) {
+    free(screen->scrollback.lines[(screen->scrollback.head + i) % screen->scrollback.capacity]);
+  }
+  free(screen->scrollback.lines);
+  free(screen->scrollback.widths);
 }
 
 void free_terminal(Terminal *terminal) {
@@ -115,6 +126,20 @@ void init_terminal(Terminal *terminal, int width, int height) {
 }
 
 void scroll_screen(Term_Screen *screen, int width, int height) {
+  Term_Scrollback *sb = &screen->scrollback;
+  int idx;
+  if (sb->count < sb->capacity) {
+    idx = (sb->head + sb->count) % sb->capacity;
+    sb->count++;
+  } else {
+    idx = sb->head;
+    free(sb->lines[idx]);
+    sb->head = (sb->head + 1) % sb->capacity;
+  }
+  sb->lines[idx] = malloc(width * sizeof(Term_Cell));
+  memcpy(sb->lines[idx], screen->lines[0].cells, width * sizeof(Term_Cell));
+  sb->widths[idx] = width;
+
   for (int j = 0; j < height - 1; j++) {
     for (int k = 0; k < width; k++) {
       screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
@@ -427,6 +452,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   int width = terminal->width;
   int height = terminal->height;
 
+  Term_Screen *active = terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+  active->scroll_offset = 0;
+
 #ifdef DEBUG
   for (int i = 0; i < tokens->count; i++) {
     Term_Token token = tokens->tokens[i];
@@ -515,6 +543,14 @@ void write_string(Terminal *terminal, const char *str) {
 }
 
 void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
+  Term_Scrollback *sb = &screen->scrollback;
+  for (int i = 0; i < sb->count; i++) {
+    free(sb->lines[(sb->head + i) % sb->capacity]);
+  }
+  sb->count = 0;
+  sb->head = 0;
+  screen->scroll_offset = 0;
+
   Term_Line *new_lines = (Term_Line *)malloc(new_height * sizeof(Term_Line));
 
   for (int i = 0; i < new_height; i++) {

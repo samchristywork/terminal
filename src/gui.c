@@ -187,9 +187,21 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, 0,
                  gui->window_width, gui->window_height);
 
+  int scroll_offset = term_screen->scroll_offset;
+  Term_Scrollback *sb = &term_screen->scrollback;
+
   for (int y = 0; y < terminal->height; y++) {
     for (int x = 0; x < terminal->width; x++) {
-      Term_Cell cell = term_screen->lines[y].cells[x];
+      Term_Cell cell;
+      int combined = sb->count - scroll_offset + y;
+      if (combined < 0) {
+        memset(&cell, 0, sizeof(Term_Cell));
+      } else if (combined < sb->count) {
+        int idx = (sb->head + combined) % sb->capacity;
+        cell = (x < sb->widths[idx]) ? sb->lines[idx][x] : (Term_Cell){0};
+      } else {
+        cell = term_screen->lines[combined - sb->count].cells[x];
+      }
 
       int pixel_x = x * gui->char_width + 10;
       int pixel_y = y * (gui->char_height + LINE_GAP) + 10;
@@ -199,7 +211,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
-      bool is_cursor =
+      bool is_cursor = (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       bool reverse = cell.attr.reverse || is_cursor;
 
@@ -456,7 +468,19 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     KeySym keysym;
     XLookupString(&event->xkey, buffer, sizeof(buffer), &keysym, NULL);
 
-    if (keysym == XK_BackSpace) {
+    Term_Screen *scr = terminal->using_alt_screen
+                           ? &terminal->alt_screen : &terminal->screen;
+    int max_scroll = scr->scrollback.count;
+
+    if (keysym == XK_Prior && (event->xkey.state & ShiftMask)) {
+      scr->scroll_offset += terminal->height;
+      if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
+      draw_terminal(gui, terminal);
+    } else if (keysym == XK_Next && (event->xkey.state & ShiftMask)) {
+      scr->scroll_offset -= terminal->height;
+      if (scr->scroll_offset < 0) scr->scroll_offset = 0;
+      draw_terminal(gui, terminal);
+    } else if (keysym == XK_BackSpace) {
       buffer[0] = 0x7f;
       write(gui->pipe_fd, buffer, 1);
     } else if (keysym == XK_Up) {
@@ -472,6 +496,21 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       if (len > 0) {
         write(gui->pipe_fd, buffer, len);
       }
+    }
+    break;
+  }
+  case ButtonPress: {
+    Term_Screen *scr = terminal->using_alt_screen
+                           ? &terminal->alt_screen : &terminal->screen;
+    int max_scroll = scr->scrollback.count;
+    if (event->xbutton.button == Button4) {
+      scr->scroll_offset += 3;
+      if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
+      draw_terminal(gui, terminal);
+    } else if (event->xbutton.button == Button5) {
+      scr->scroll_offset -= 3;
+      if (scr->scroll_offset < 0) scr->scroll_offset = 0;
+      draw_terminal(gui, terminal);
     }
     break;
   }
