@@ -4,6 +4,10 @@
 typedef struct {
   int font_size;
   char *log_file;
+  char *font;       // NULL = use bundled FreeMono
+  long fg;          // -1 = default white
+  long bg;          // -1 = default black
+  long palette[16]; // -1 = use built-in default for that slot
 } Args;
 
 void parse_args(int argc, char *argv[], Args *args);

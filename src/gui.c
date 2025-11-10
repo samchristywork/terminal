@@ -28,9 +28,13 @@ typedef struct {
   XftColor xft_colors[16];
   XftColor xft_white;
   XftColor xft_black;
+  XftColor xft_default_fg;
+  XftColor xft_default_bg;
   int screen;
   unsigned long black, white;
   unsigned long colors[16];
+  unsigned long default_fg;
+  unsigned long default_bg;
   int char_width, char_height;
   int char_ascent;
   int pipe_fd;
@@ -49,7 +53,7 @@ typedef struct {
   int selection_len;
 } GuiContext;
 
-void init_colors(GuiContext *gui) {
+void init_colors(GuiContext *gui, Args *args) {
   Colormap colormap = DefaultColormap(gui->display, gui->screen);
   XColor color;
   XRenderColor xrender_color;
@@ -73,6 +77,11 @@ void init_colors(GuiContext *gui) {
       0x00ffff, // bright cyan
       0xffffff  // bright white
   };
+
+  for (int i = 0; i < 16; i++) {
+    if (args->palette[i] != -1)
+      color_values[i] = (unsigned long)args->palette[i];
+  }
 
   for (int i = 0; i < 16; i++) {
     color.red = ((color_values[i] >> 16) & 0xff) << 8;
@@ -104,6 +113,33 @@ void init_colors(GuiContext *gui) {
   xrender_color.blue = 0;
   xrender_color.alpha = 0xffff;
   XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_black);
+
+  unsigned long fg_val = (args->fg != -1) ? (unsigned long)args->fg : 0xffffff;
+  unsigned long bg_val = (args->bg != -1) ? (unsigned long)args->bg : 0x000000;
+
+  color.red   = ((fg_val >> 16) & 0xff) << 8;
+  color.green = ((fg_val >>  8) & 0xff) << 8;
+  color.blue  = ( fg_val        & 0xff) << 8;
+  color.flags = DoRed | DoGreen | DoBlue;
+  gui->default_fg = XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->white;
+
+  color.red   = ((bg_val >> 16) & 0xff) << 8;
+  color.green = ((bg_val >>  8) & 0xff) << 8;
+  color.blue  = ( bg_val        & 0xff) << 8;
+  color.flags = DoRed | DoGreen | DoBlue;
+  gui->default_bg = XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->black;
+
+  xrender_color.red   = ((fg_val >> 16) & 0xff) << 8;
+  xrender_color.green = ((fg_val >>  8) & 0xff) << 8;
+  xrender_color.blue  = ( fg_val        & 0xff) << 8;
+  xrender_color.alpha = 0xffff;
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_default_fg);
+
+  xrender_color.red   = ((bg_val >> 16) & 0xff) << 8;
+  xrender_color.green = ((bg_val >>  8) & 0xff) << 8;
+  xrender_color.blue  = ( bg_val        & 0xff) << 8;
+  xrender_color.alpha = 0xffff;
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_default_bg);
 }
 
 unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
@@ -273,7 +309,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
 
-  XSetForeground(gui->display, gui->gc, gui->black);
+  XSetForeground(gui->display, gui->gc, gui->default_bg);
   XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, 0,
                  gui->window_width, gui->window_height);
 
@@ -296,7 +332,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       int pixel_x = x * gui->char_width + 10;
       int pixel_y = y * (gui->char_height + LINE_GAP) + 10;
 
-      unsigned long bg_color = gui->black;
+      unsigned long bg_color = gui->default_bg;
       if (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
@@ -311,11 +347,11 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         text_color = bg_color;
         bg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB)
                        ? get_color_pixel(gui, cell.attr.fg)
-                       : gui->white;
+                       : gui->default_fg;
       } else {
         text_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB)
                          ? get_color_pixel(gui, cell.attr.fg)
-                         : gui->white;
+                         : gui->default_fg;
       }
 
       XSetForeground(gui->display, gui->gc, bg_color);
@@ -328,9 +364,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
 
         if (reverse) {
-          fg_color = (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_black;
+          fg_color = (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_default_bg;
         } else {
-          fg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_white;
+          fg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_default_fg;
         }
 
         XftDrawString8(gui->xft_draw, fg_color, font_to_use, pixel_x,
@@ -408,7 +444,8 @@ void init_shell(GuiContext *gui, int cols, int rows) {
   }
 }
 
-int init_gui(GuiContext *gui, int font_size) {
+int init_gui(GuiContext *gui, Args *args) {
+  int font_size = args->font_size;
   LOG_INFO_MSG("Initializing GUI with font size %d", font_size);
 
   gui->display = XOpenDisplay(NULL);
@@ -430,7 +467,7 @@ int init_gui(GuiContext *gui, int font_size) {
   gui->selection_text = NULL;
   gui->selection_len = 0;
 
-  init_colors(gui);
+  init_colors(gui, args);
 
   gui->window_width = 800;
   gui->window_height = 600;
@@ -465,31 +502,44 @@ int init_gui(GuiContext *gui, int font_size) {
     snprintf(exe_dir, sizeof(exe_dir), ".");
   }
 
-  snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", exe_dir, font_size);
-  gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
-  if (!gui->font) {
-    LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
-    snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
+  if (args->font) {
+    if (strstr(args->font, "size="))
+      snprintf(font_pattern, sizeof(font_pattern), "%s", args->font);
+    else
+      snprintf(font_pattern, sizeof(font_pattern), "%s:size=%d", args->font, font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
-      fprintf(stderr, "Cannot load FreeMono font or fallback\n");
-      LOG_ERROR_MSG("Cannot load any suitable font");
+      fprintf(stderr, "Cannot load font '%s'\n", args->font);
+      LOG_ERROR_MSG("Cannot load configured font: %s", args->font);
       XCloseDisplay(gui->display);
       return 1;
     }
-  }
-  LOG_INFO_MSG("Loaded font: %s", font_pattern);
+    gui->font_bold = gui->font;
+  } else {
+    snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", exe_dir, font_size);
+    gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
+    if (!gui->font) {
+      LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
+      snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
+      gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
+      if (!gui->font) {
+        fprintf(stderr, "Cannot load FreeMono font or fallback\n");
+        LOG_ERROR_MSG("Cannot load any suitable font");
+        XCloseDisplay(gui->display);
+        return 1;
+      }
+    }
 
-  snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", exe_dir, font_size);
-  gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
-
-  if (!gui->font_bold) {
-    snprintf(font_pattern, sizeof(font_pattern), "mono:weight=bold:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", exe_dir, font_size);
     gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font_bold) {
-      gui->font_bold = gui->font;
+      snprintf(font_pattern, sizeof(font_pattern), "mono:weight=bold:size=%d", font_size);
+      gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
+      if (!gui->font_bold)
+        gui->font_bold = gui->font;
     }
   }
+  LOG_INFO_MSG("Loaded font: %s", font_pattern);
 
   gui->char_width = gui->font->max_advance_width;
   gui->char_height = gui->font->ascent + gui->font->descent;
@@ -734,6 +784,8 @@ void cleanup_gui(GuiContext *gui) {
   }
   XftColorFree(gui->display, visual, colormap, &gui->xft_white);
   XftColorFree(gui->display, visual, colormap, &gui->xft_black);
+  XftColorFree(gui->display, visual, colormap, &gui->xft_default_fg);
+  XftColorFree(gui->display, visual, colormap, &gui->xft_default_bg);
 
   free(gui->selection_text);
 
@@ -765,7 +817,7 @@ int main(int argc, char *argv[]) {
   XEvent event;
   int running = 1;
 
-  if (init_gui(&gui, args.font_size) != 0) {
+  if (init_gui(&gui, &args) != 0) {
     log_close();
     return 1;
   }
