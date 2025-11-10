@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <pty.h>
+#include <time.h>
 
 #include "terminal.h"
 #include "args.h"
@@ -51,6 +52,8 @@ typedef struct {
   int sel_cur_x, sel_cur_y;
   char *selection_text;
   int selection_len;
+  bool cursor_visible;
+  struct timespec last_blink;
 } GuiContext;
 
 void init_colors(GuiContext *gui, Args *args) {
@@ -337,7 +340,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
-      bool is_cursor = (scroll_offset == 0) &&
+      bool is_cursor = gui->cursor_visible && (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       bool in_selection = cell_in_selection(gui, x, y);
       bool reverse = cell.attr.reverse || is_cursor || in_selection;
@@ -552,6 +555,9 @@ int init_gui(GuiContext *gui, Args *args) {
                                 DefaultVisual(gui->display, gui->screen),
                                 DefaultColormap(gui->display, gui->screen));
 
+  gui->cursor_visible = true;
+  clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
+
   return 0;
 }
 
@@ -613,6 +619,8 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
     break;
   }
   case KeyPress: {
+    gui->cursor_visible = true;
+    clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
     char buffer[32];
     KeySym keysym;
     XLookupString(&event->xkey, buffer, sizeof(buffer), &keysym, NULL);
@@ -847,6 +855,17 @@ int main(int argc, char *argv[]) {
     if (activity < 0) {
       perror("select");
       break;
+    }
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long elapsed_ms = (now.tv_sec - gui.last_blink.tv_sec) * 1000 +
+                      (now.tv_nsec - gui.last_blink.tv_nsec) / 1000000;
+    if (elapsed_ms >= 500) {
+      gui.cursor_visible = !gui.cursor_visible;
+      gui.last_blink = now;
+      draw_terminal(&gui, &terminal);
+      XFlush(gui.display);
     }
 
     while (XPending(gui.display)) {
