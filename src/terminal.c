@@ -249,6 +249,10 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
+    } else if (matches(text, length, i, "\x1b" "7", &len)) {
+      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+    } else if (matches(text, length, i, "\x1b" "8", &len)) {
+      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\t", &len)) {
@@ -479,6 +483,18 @@ void print_token(Term_Token t) {
   printf("\n");
 }
 
+static int csi_param(Term_Token token, int default_val) {
+  if (token.length < 3) return default_val;
+  char buf[32];
+  int param_len = token.length - 3;
+  if (param_len <= 0) return default_val;
+  if (param_len >= (int)sizeof(buf)) param_len = (int)sizeof(buf) - 1;
+  memcpy(buf, &token.value[2], param_len);
+  buf[param_len] = '\0';
+  int val = atoi(buf);
+  return val <= 0 ? default_val : val;
+}
+
 void write_terminal(Terminal *terminal, const char *text, int length) {
   Term_Tokens *tokens = tokenize(text, length);
   int width = terminal->width;
@@ -509,7 +525,77 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_CARRIAGE_RETURN) {
       cursor->x = 0;
     } else if (token.type == TOKEN_CSI_CODE) {
-      modify_cursor(&cursor, token);
+      char final = token.value[token.length - 1];
+      int n = csi_param(token, 1);
+      if (final == 'A') {
+        cursor->y -= n;
+        if (cursor->y < 0) cursor->y = 0;
+      } else if (final == 'B') {
+        cursor->y += n;
+        if (cursor->y >= height) cursor->y = height - 1;
+      } else if (final == 'C') {
+        cursor->x += n;
+        if (cursor->x >= width) cursor->x = width - 1;
+      } else if (final == 'D') {
+        cursor->x -= n;
+        if (cursor->x < 0) cursor->x = 0;
+      } else if (final == 'E') {
+        cursor->y += n;
+        if (cursor->y >= height) cursor->y = height - 1;
+        cursor->x = 0;
+      } else if (final == 'F') {
+        cursor->y -= n;
+        if (cursor->y < 0) cursor->y = 0;
+        cursor->x = 0;
+      } else if (final == 'G') {
+        cursor->x = n - 1;
+        if (cursor->x < 0) cursor->x = 0;
+        if (cursor->x >= width) cursor->x = width - 1;
+      } else if (final == 'd') {
+        cursor->y = n - 1;
+        if (cursor->y < 0) cursor->y = 0;
+        if (cursor->y >= height) cursor->y = height - 1;
+      } else if (final == '7' || final == 's') {
+        screen->saved_cursor = *cursor;
+      } else if (final == '8' || final == 'u') {
+        *cursor = screen->saved_cursor;
+      } else if (final == 'L') {
+        int rows = (n < height - cursor->y) ? n : height - cursor->y;
+        for (int j = height - 1; j >= cursor->y + rows; j--)
+          memcpy(screen->lines[j].cells, screen->lines[j - rows].cells,
+                 width * sizeof(Term_Cell));
+        for (int j = cursor->y; j < cursor->y + rows; j++)
+          for (int k = 0; k < width; k++)
+            memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == 'M') {
+        int rows = (n < height - cursor->y) ? n : height - cursor->y;
+        for (int j = cursor->y; j < height - rows; j++)
+          memcpy(screen->lines[j].cells, screen->lines[j + rows].cells,
+                 width * sizeof(Term_Cell));
+        for (int j = height - rows; j < height; j++)
+          for (int k = 0; k < width; k++)
+            memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == '@') {
+        int cols = (n < width - cursor->x) ? n : width - cursor->x;
+        int move = width - cursor->x - cols;
+        if (move > 0)
+          memmove(&screen->lines[cursor->y].cells[cursor->x + cols],
+                  &screen->lines[cursor->y].cells[cursor->x],
+                  move * sizeof(Term_Cell));
+        for (int k = cursor->x; k < cursor->x + cols; k++)
+          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == 'P') {
+        int cols = (n < width - cursor->x) ? n : width - cursor->x;
+        int move = width - cursor->x - cols;
+        if (move > 0)
+          memmove(&screen->lines[cursor->y].cells[cursor->x],
+                  &screen->lines[cursor->y].cells[cursor->x + cols],
+                  move * sizeof(Term_Cell));
+        for (int k = width - cols; k < width; k++)
+          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+      } else {
+        modify_cursor(&cursor, token);
+      }
     } else if (token.type == TOKEN_ERASE_EOL) {
       for (int j = cursor->x; j < width; j++) {
         memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));

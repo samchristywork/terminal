@@ -60,6 +60,7 @@ typedef struct {
 
 typedef struct {
   Term_Cursor cursor;
+  Term_Cursor saved_cursor;
   Term_Line *lines;
   Term_Scrollback scrollback;
   int scroll_offset;
