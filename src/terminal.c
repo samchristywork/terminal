@@ -280,9 +280,15 @@ Term_Tokens *tokenize(const char *text, int length) {
       len = 1;
     } else {
       int start = i;
-      while (i < length && (unsigned char)text[i] >= 0x20 &&
-             (unsigned char)text[i] < 0x7f) {
-        i++;
+      while (i < length) {
+        unsigned char c = (unsigned char)text[i];
+        if (c >= 0x20 && c < 0x7f) {
+          i++;
+        } else if (c >= 0x80) {
+          i++;  // multi-byte UTF-8 lead or continuation byte
+        } else {
+          break;
+        }
       }
       len = i - start;
       if (len > 0) {
@@ -300,8 +306,8 @@ Term_Tokens *tokenize(const char *text, int length) {
   return tokens;
 }
 
-void write_regular_char(Term_Screen *screen, char c, int width, int height,
-                        Term_Attr attr) {
+void write_regular_cell(Term_Screen *screen, const char *data, int data_len,
+                        int width, int height, Term_Attr attr) {
   if (screen->cursor.x >= width) {
     handle_newline(screen, width, height);
     screen->cursor.x = 0;
@@ -309,8 +315,9 @@ void write_regular_char(Term_Screen *screen, char c, int width, int height,
 
   if (screen->cursor.y < height) {
     Term_Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
-    cell->data[0] = c;
-    cell->length = 1;
+    if (data_len > 6) data_len = 6;
+    memcpy(cell->data, data, data_len);
+    cell->length = data_len;
     cell->attr = attr;
     screen->cursor.x++;
   }
@@ -535,8 +542,17 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     Term_Cursor *cursor = &screen->cursor;
     if (token.type == TOKEN_TEXT) {
-      for (int j = 0; j < token.length; j++) {
-        write_regular_char(screen, token.value[j], width, height, cursor->attr);
+      int j = 0;
+      while (j < token.length) {
+        unsigned char c = (unsigned char)token.value[j];
+        int char_len;
+        if (c < 0x80)       char_len = 1;
+        else if (c < 0xE0)  char_len = 2;
+        else if (c < 0xF0)  char_len = 3;
+        else                char_len = 4;
+        if (j + char_len > token.length) char_len = token.length - j;
+        write_regular_cell(screen, &token.value[j], char_len, width, height, cursor->attr);
+        j += char_len;
       }
     } else if (token.type == TOKEN_NEWLINE) {
       handle_newline(screen, width, height);

@@ -359,7 +359,6 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
                      gui->char_width, gui->char_height);
 
       if (cell.length > 0) {
-        char ch = cell.data[0];
         XftColor *fg_color;
         XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
 
@@ -369,8 +368,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           fg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_default_fg;
         }
 
-        XftDrawString8(gui->xft_draw, fg_color, font_to_use, pixel_x,
-                      pixel_y + gui->char_ascent, (FcChar8*)&ch, 1);
+        XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
+                          pixel_y + gui->char_ascent, (FcChar8*)cell.data, cell.length);
 
         if (cell.attr.underline) {
           XSetForeground(gui->display, gui->gc, text_color);
