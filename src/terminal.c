@@ -202,6 +202,22 @@ bool is_csi_code(const char *text, int length, int index, int *code_length) {
   return false;
 }
 
+bool is_osc_sequence(const char *text, int length, int index, int *seq_length) {
+  if (index + 2 >= length || text[index] != '\x1b' || text[index + 1] != ']')
+    return false;
+  for (int i = index + 2; i < length; i++) {
+    if ((unsigned char)text[i] == 0x07) {
+      *seq_length = i - index + 1;
+      return true;
+    }
+    if (i + 1 < length && text[i] == '\x1b' && text[i + 1] == '\\') {
+      *seq_length = i - index + 2;
+      return true;
+    }
+  }
+  return false;
+}
+
 bool matches(const char *text, int length, int index, const char *pattern,
              int *pattern_length) {
   int pat_len = strlen(pattern);
@@ -253,6 +269,8 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b" "8", &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+    } else if (is_osc_sequence(text, length, i, &len)) {
+      add_token(tokens, TOKEN_OSC, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\t", &len)) {
@@ -648,6 +666,27 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       if (cursor->x > 0) {
         cursor->x--;
         memset(&screen->lines[cursor->y].cells[cursor->x], 0, sizeof(Term_Cell));
+      }
+    } else if (token.type == TOKEN_OSC) {
+      // Parse: ESC ] cmd ; text BEL/ST
+      int i = 2;
+      int cmd = 0;
+      while (i < token.length && token.value[i] >= '0' && token.value[i] <= '9')
+        cmd = cmd * 10 + (token.value[i++] - '0');
+      if (i < token.length && token.value[i] == ';') i++;
+      if (cmd == 0 || cmd == 1 || cmd == 2) {
+        int text_start = i;
+        // stop before BEL or ESC (ST)
+        int text_end = token.length - 1;
+        if (text_end > text_start && token.value[text_end] == '\\')
+          text_end--; // strip the '\\' of ESC-backslash ST
+        int tlen = text_end - text_start;
+        if (tlen < 0) tlen = 0;
+        if (tlen >= (int)sizeof(terminal->window_title))
+          tlen = sizeof(terminal->window_title) - 1;
+        memcpy(terminal->window_title, &token.value[text_start], tlen);
+        terminal->window_title[tlen] = '\0';
+        terminal->title_dirty = true;
       }
     }
   }

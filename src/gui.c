@@ -812,6 +812,10 @@ int main(int argc, char *argv[]) {
 
     if (FD_ISSET(gui.pipe_fd, &read_fds)) {
       read_shell_output(&gui, &terminal);
+      if (terminal.title_dirty) {
+        XStoreName(gui.display, gui.window, terminal.window_title);
+        terminal.title_dirty = false;
+      }
       draw_terminal(&gui, &terminal);
       XFlush(gui.display);
     }

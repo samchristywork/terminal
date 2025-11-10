@@ -72,6 +72,8 @@ typedef struct {
   Term_Screen screen;
   Term_Screen alt_screen;
   bool using_alt_screen;
+  char window_title[256];
+  bool title_dirty;
 } Terminal;
 
 typedef enum {
@@ -90,6 +92,7 @@ typedef enum {
   TOKEN_MAIN_SCREEN,      // ESC[?1049l
   TOKEN_TAB,              // \t
   TOKEN_BACKSPACE,        // \b or 0x7f
+  TOKEN_OSC,              // ESC ] ... BEL/ST
   TOKEN_UNKNOWN,
 } Term_TokenType;
 
