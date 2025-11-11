@@ -644,20 +644,56 @@ void handle_events(GuiContext *gui, Terminal *terminal, int *running,
       XConvertSelection(gui->display, gui->atom_clipboard, gui->atom_utf8_string,
                         gui->atom_xsel_data, gui->window, CurrentTime);
     } else if (keysym == XK_BackSpace) {
-      buffer[0] = 0x7f;
-      write(gui->pipe_fd, buffer, 1);
+      write(gui->pipe_fd, "\x7f", 1);
+    } else if (keysym == XK_Return || keysym == XK_KP_Enter) {
+      write(gui->pipe_fd, "\r", 1);
+    } else if (keysym == XK_Tab) {
+      write(gui->pipe_fd, "\t", 1);
+    } else if (keysym == XK_Escape) {
+      write(gui->pipe_fd, "\x1b", 1);
     } else if (keysym == XK_Up) {
-      write(gui->pipe_fd, "\x1b[A", 3);
+      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
+            (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Down) {
-      write(gui->pipe_fd, "\x1b[B", 3);
+      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5B" : "\x1b[B",
+            (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Right) {
-      write(gui->pipe_fd, "\x1b[C", 3);
+      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5C" : "\x1b[C",
+            (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Left) {
-      write(gui->pipe_fd, "\x1b[D", 3);
+      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5D" : "\x1b[D",
+            (event->xkey.state & ControlMask) ? 6 : 3);
+    } else if (keysym == XK_Home) {
+      write(gui->pipe_fd, "\x1b[H", 3);
+    } else if (keysym == XK_End) {
+      write(gui->pipe_fd, "\x1b[F", 3);
+    } else if (keysym == XK_Insert) {
+      write(gui->pipe_fd, "\x1b[2~", 4);
+    } else if (keysym == XK_Delete) {
+      write(gui->pipe_fd, "\x1b[3~", 4);
+    } else if (keysym == XK_Prior) {
+      write(gui->pipe_fd, "\x1b[5~", 4);
+    } else if (keysym == XK_Next) {
+      write(gui->pipe_fd, "\x1b[6~", 4);
+    } else if (keysym >= XK_F1 && keysym <= XK_F12) {
+      const char *fkeys[] = {
+        "\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",
+        "\x1b[15~", "\x1b[17~", "\x1b[18~", "\x1b[19~",
+        "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~",
+      };
+      const char *seq = fkeys[keysym - XK_F1];
+      write(gui->pipe_fd, seq, strlen(seq));
     } else {
       int len = XLookupString(&event->xkey, buffer, sizeof(buffer), NULL, NULL);
       if (len > 0) {
-        write(gui->pipe_fd, buffer, len);
+        if (event->xkey.state & Mod1Mask) {
+          char alt_buf[33];
+          alt_buf[0] = '\x1b';
+          memcpy(&alt_buf[1], buffer, len);
+          write(gui->pipe_fd, alt_buf, len + 1);
+        } else {
+          write(gui->pipe_fd, buffer, len);
+        }
       }
     }
     break;
