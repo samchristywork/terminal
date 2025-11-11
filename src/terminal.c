@@ -193,6 +193,10 @@ bool is_csi_code(const char *text, int length, int index, int *code_length) {
            (unsigned char)text[i] <= 0x3f) {
       i++;
     }
+    while (i < length && (unsigned char)text[i] >= 0x20 &&
+           (unsigned char)text[i] <= 0x2f) {
+      i++;
+    }
     if (i < length && (unsigned char)text[i] >= 0x40 &&
         (unsigned char)text[i] <= 0x7e) {
       *code_length = i - index + 1;
@@ -269,6 +273,14 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b" "8", &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+    } else if (i + 1 < length && text[i] == '\x1b' &&
+               (text[i + 1] == '=' || text[i + 1] == '>' ||
+                text[i + 1] == 'c' || text[i + 1] == 'M')) {
+      len = 2; // application/normal keypad, reset, reverse index — ignore
+    } else if (i + 2 < length && text[i] == '\x1b' &&
+               (text[i + 1] == '(' || text[i + 1] == ')' ||
+                text[i + 1] == '*' || text[i + 1] == '+')) {
+      len = 3; // character set designation (e.g., \x1b(B) — ignore
     } else if (is_osc_sequence(text, length, i, &len)) {
       add_token(tokens, TOKEN_OSC, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {

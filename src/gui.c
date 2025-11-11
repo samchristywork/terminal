@@ -430,6 +430,7 @@ void init_shell(GuiContext *gui, int cols, int rows) {
     if (slave > STDERR_FILENO)
       close(slave);
 
+    setenv("TERM", "xterm-256color", 1);
     execl("/bin/sh", "sh", NULL);
     perror("execl");
     exit(1);
@@ -518,11 +519,27 @@ int init_gui(GuiContext *gui, Args *args) {
     }
     gui->font_bold = gui->font;
   } else {
-    snprintf(font_pattern, sizeof(font_pattern), "FreeMono:file=%s/assets/FreeMono.otf:size=%d", exe_dir, font_size);
+    char repo_dir[512];
+    char *sep = strrchr(exe_dir, '/');
+    if (sep && sep != exe_dir) {
+      int rlen = (int)(sep - exe_dir);
+      memcpy(repo_dir, exe_dir, rlen);
+      repo_dir[rlen] = '\0';
+    } else {
+      snprintf(repo_dir, sizeof(repo_dir), "%s", exe_dir);
+    }
+
+    char bundled_font[1024];
+    snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf", repo_dir);
+    FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
+    snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf", repo_dir);
+    FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
+
+    snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d", font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
-      snprintf(font_pattern, sizeof(font_pattern), "mono-%d", font_size);
+      snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d", font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
       if (!gui->font) {
         fprintf(stderr, "Cannot load FreeMono font or fallback\n");
@@ -532,10 +549,10 @@ int init_gui(GuiContext *gui, Args *args) {
       }
     }
 
-    snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:file=%s/assets/FreeMonoBold.otf:size=%d", exe_dir, font_size);
+    snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:size=%d", font_size);
     gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font_bold) {
-      snprintf(font_pattern, sizeof(font_pattern), "mono:weight=bold:size=%d", font_size);
+      snprintf(font_pattern, sizeof(font_pattern), "monospace:weight=bold:size=%d", font_size);
       gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
       if (!gui->font_bold)
         gui->font_bold = gui->font;
