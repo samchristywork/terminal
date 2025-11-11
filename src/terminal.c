@@ -681,7 +681,6 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_BACKSPACE) {
       if (cursor->x > 0) {
         cursor->x--;
-        memset(&screen->lines[cursor->y].cells[cursor->x], 0, sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_OSC) {
       // Parse: ESC ] cmd ; text BEL/ST
