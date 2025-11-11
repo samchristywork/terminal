@@ -519,48 +519,54 @@ int init_gui(GuiContext *gui, Args *args) {
     }
     gui->font_bold = gui->font;
   } else {
-    char repo_dir[512];
-    char *sep = strrchr(exe_dir, '/');
-    if (sep && sep != exe_dir) {
-      int rlen = (int)(sep - exe_dir);
-      memcpy(repo_dir, exe_dir, rlen);
-      repo_dir[rlen] = '\0';
-    } else {
-      snprintf(repo_dir, sizeof(repo_dir), "%s", exe_dir);
-    }
-
-    char bundled_font[1024];
-    snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf", repo_dir);
-    FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-    snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf", repo_dir);
-    FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-
-    snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern), "Iosevka Nerd Font Mono:size=%d", font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
-      LOG_WARNING_MSG("Cannot load FreeMono font, trying fallback");
+      LOG_WARNING_MSG("Cannot load Iosevka font, trying FreeMono");
+      char repo_dir[512];
+      char *sep = strrchr(exe_dir, '/');
+      if (sep && sep != exe_dir) {
+        int rlen = (int)(sep - exe_dir);
+        memcpy(repo_dir, exe_dir, rlen);
+        repo_dir[rlen] = '\0';
+      } else {
+        snprintf(repo_dir, sizeof(repo_dir), "%s", exe_dir);
+      }
+      char bundled_font[1024];
+      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf", repo_dir);
+      FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
+      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf", repo_dir);
+      FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
+      snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d", font_size);
+      gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
+    }
+    if (!gui->font) {
+      LOG_WARNING_MSG("Cannot load FreeMono font, trying monospace fallback");
       snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d", font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
-      if (!gui->font) {
-        fprintf(stderr, "Cannot load FreeMono font or fallback\n");
-        LOG_ERROR_MSG("Cannot load any suitable font");
-        XCloseDisplay(gui->display);
-        return 1;
-      }
+    }
+    if (!gui->font) {
+      fprintf(stderr, "Cannot load any suitable font\n");
+      LOG_ERROR_MSG("Cannot load any suitable font");
+      XCloseDisplay(gui->display);
+      return 1;
     }
 
-    snprintf(font_pattern, sizeof(font_pattern), "FreeMonoBold:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern), "Iosevka Nerd Font Mono:weight=bold:size=%d", font_size);
     gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font_bold) {
       snprintf(font_pattern, sizeof(font_pattern), "monospace:weight=bold:size=%d", font_size);
       gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
-      if (!gui->font_bold)
-        gui->font_bold = gui->font;
     }
+    if (!gui->font_bold)
+      gui->font_bold = gui->font;
   }
   LOG_INFO_MSG("Loaded font: %s", font_pattern);
 
   gui->char_width = gui->font->max_advance_width;
+  if (gui->font_bold && gui->font_bold != gui->font &&
+      gui->font_bold->max_advance_width > gui->char_width)
+    gui->char_width = gui->font_bold->max_advance_width;
   gui->char_height = gui->font->ascent + gui->font->descent;
   gui->char_ascent = gui->font->ascent;
 
