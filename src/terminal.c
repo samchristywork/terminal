@@ -382,8 +382,8 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
 
     char num_str[16];
     int num_len = token.length - 8;
-    if (num_len >= sizeof(num_str)) {
-      num_len = sizeof(num_str) - 1;
+    if (num_len >= (int)sizeof(num_str)) {
+      num_len = (int)sizeof(num_str) - 1;
     }
     memcpy(num_str, &token.value[7], num_len);
     num_str[num_len] = '\0';
@@ -401,8 +401,8 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
 
     char num_str[16];
     int num_len = token.length - 8;
-    if (num_len >= sizeof(num_str)) {
-      num_len = sizeof(num_str) - 1;
+    if (num_len >= (int)sizeof(num_str)) {
+      num_len = (int)sizeof(num_str) - 1;
     }
     memcpy(num_str, &token.value[7], num_len);
     num_str[num_len] = '\0';
@@ -451,8 +451,8 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
       }
       char num_str[16];
       int num_len = j - i;
-      if (num_len >= sizeof(num_str)) {
-        num_len = sizeof(num_str) - 1;
+      if (num_len >= (int)sizeof(num_str)) {
+        num_len = (int)sizeof(num_str) - 1;
       }
       memcpy(num_str, &token.value[i], num_len);
       num_str[num_len] = '\0';

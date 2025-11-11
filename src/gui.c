@@ -487,7 +487,7 @@ int init_gui(GuiContext *gui, Args *args) {
   XSetForeground(gui->display, gui->gc, gui->white);
   XSetBackground(gui->display, gui->gc, gui->black);
 
-  char font_pattern[256];
+  char font_pattern[1024];
   char exe_path[512];
   char exe_dir[512];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
@@ -570,8 +570,7 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
   }
 }
 
-void handle_events(GuiContext *gui, Terminal *terminal, int *running,
-                   XEvent *event) {
+void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
   switch (event->type) {
   case Expose:
     read_shell_output(gui, terminal);
@@ -906,7 +905,7 @@ int main(int argc, char *argv[]) {
 
     while (XPending(gui.display)) {
       XNextEvent(gui.display, &event);
-      handle_events(&gui, &terminal, &running, &event);
+      handle_events(&gui, &terminal, &event);
     }
 
     int status;
