@@ -17,7 +17,6 @@
 #include "args.h"
 #include "log.h"
 
-#define LINE_GAP 2
 
 typedef struct {
   Display *display;
@@ -331,7 +330,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       }
 
       int pixel_x = x * gui->char_width + 10;
-      int pixel_y = y * (gui->char_height + LINE_GAP) + 10;
+      int pixel_y = y * (gui->char_height) + 10;
 
       unsigned long bg_color = gui->default_bg;
       if (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) {
@@ -617,7 +616,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
                                     DefaultColormap(gui->display, gui->screen));
 
       int term_cols = (new_width - 20) / gui->char_width;
-      int term_rows = (new_height - 20) / (gui->char_height + LINE_GAP);
+      int term_rows = (new_height - 20) / (gui->char_height);
 
       if (term_cols < 1) term_cols = 1;
       if (term_rows < 1) term_rows = 1;
@@ -724,7 +723,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     int max_scroll = scr->scrollback.count;
     if (event->xbutton.button == Button1) {
       int cell_x = (event->xbutton.x - 10) / gui->char_width;
-      int cell_y = (event->xbutton.y - 10) / (gui->char_height + LINE_GAP);
+      int cell_y = (event->xbutton.y - 10) / (gui->char_height);
       if (cell_x < 0) cell_x = 0;
       if (cell_x >= terminal->width) cell_x = terminal->width - 1;
       if (cell_y < 0) cell_y = 0;
@@ -756,7 +755,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       Term_Screen *scr = terminal->using_alt_screen
                              ? &terminal->alt_screen : &terminal->screen;
       int cell_x = (event->xbutton.x - 10) / gui->char_width;
-      int cell_y = (event->xbutton.y - 10) / (gui->char_height + LINE_GAP);
+      int cell_y = (event->xbutton.y - 10) / (gui->char_height);
       if (cell_x < 0) cell_x = 0;
       if (cell_x >= terminal->width) cell_x = terminal->width - 1;
       if (cell_y < 0) cell_y = 0;
@@ -779,7 +778,7 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       Term_Screen *scr = terminal->using_alt_screen
                              ? &terminal->alt_screen : &terminal->screen;
       int cell_x = (event->xmotion.x - 10) / gui->char_width;
-      int cell_y = (event->xmotion.y - 10) / (gui->char_height + LINE_GAP);
+      int cell_y = (event->xmotion.y - 10) / (gui->char_height);
       if (cell_x < 0) cell_x = 0;
       if (cell_x >= terminal->width) cell_x = terminal->width - 1;
       if (cell_y < 0) cell_y = 0;
@@ -892,7 +891,7 @@ int main(int argc, char *argv[]) {
   }
 
   int term_cols = (gui.window_width - 20) / gui.char_width;
-  int term_rows = (gui.window_height - 20) / (gui.char_height + LINE_GAP);
+  int term_rows = (gui.window_height - 20) / (gui.char_height);
   if (term_cols < 1) term_cols = 1;
   if (term_rows < 1) term_rows = 1;
   init_terminal(&terminal, term_cols, term_rows);
