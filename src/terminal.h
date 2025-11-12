@@ -95,6 +95,7 @@ typedef enum {
   TOKEN_TAB,              // \t
   TOKEN_BACKSPACE,        // \b or 0x7f
   TOKEN_OSC,              // ESC ] ... BEL/ST
+  TOKEN_REVERSE_INDEX,    // ESC M
   TOKEN_UNKNOWN,
 } Term_TokenType;
 

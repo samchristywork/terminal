@@ -276,10 +276,12 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b" "8", &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+    } else if (matches(text, length, i, "\x1b" "M", &len)) {
+      add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
     } else if (i + 1 < length && text[i] == '\x1b' &&
                (text[i + 1] == '=' || text[i + 1] == '>' ||
-                text[i + 1] == 'c' || text[i + 1] == 'M')) {
-      len = 2; // application/normal keypad, reset, reverse index — ignore
+                text[i + 1] == 'c')) {
+      len = 2; // application/normal keypad, full reset. Ignore
     } else if (i + 2 < length && text[i] == '\x1b' &&
                (text[i + 1] == '(' || text[i + 1] == ')' ||
                 text[i + 1] == '*' || text[i + 1] == '+')) {
@@ -735,6 +737,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_BACKSPACE) {
       if (cursor->x > 0) {
         cursor->x--;
+      }
+    } else if (token.type == TOKEN_REVERSE_INDEX) {
+      if (cursor->y > 0) {
+        cursor->y--;
+      } else {
+        for (int j = height - 1; j > 0; j--)
+          memcpy(screen->lines[j].cells, screen->lines[j - 1].cells,
+                 width * sizeof(Term_Cell));
+        memset(screen->lines[0].cells, 0, width * sizeof(Term_Cell));
       }
     } else if (token.type == TOKEN_OSC) {
       // Parse: ESC ] cmd ; text BEL/ST
