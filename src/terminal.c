@@ -477,34 +477,16 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
     }
   } else if (ends_with(token.value, token.length, 'H') ||
              ends_with(token.value, token.length, 'f')) {
-    if (token.length < 3) {
-      return;
-    }
+    const char *p = token.value + 2;
+    const char *end = token.value + token.length - 1; // points at 'H' or 'f'
 
-    int row = 1;
-    int col = 1;
+    int row = 0, col = 0;
+    while (p < end && *p != ';') row = row * 10 + (*p++ - '0');
+    if (p < end) p++; // skip ';'
+    while (p < end) col = col * 10 + (*p++ - '0');
 
-    char *token_copy = (char *)malloc((token.length + 1) * sizeof(char));
-    memcpy(token_copy, token.value, token.length);
-    token_copy[token.length - 1] = '\0'; // strip terminator ('H' or 'f')
-
-    char *part = strtok(token_copy + 2, ";");
-    if (part != NULL) {
-      row = atoi(part);
-      part = strtok(NULL, ";");
-      if (part != NULL) {
-        col = atoi(part);
-      }
-    }
-
-    free(token_copy);
-
-    if (row < 1) {
-      row = 1;
-    }
-    if (col < 1) {
-      col = 1;
-    }
+    if (row < 1) row = 1;
+    if (col < 1) col = 1;
 
     (*cursor)->y = row - 1;
     (*cursor)->x = col - 1;
