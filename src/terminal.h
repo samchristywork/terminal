@@ -74,6 +74,8 @@ typedef struct {
   bool using_alt_screen;
   char window_title[256];
   bool title_dirty;
+  char partial_buf[64];
+  int partial_len;
 } Terminal;
 
 typedef enum {

@@ -127,6 +127,9 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->width = width;
   terminal->height = height;
   terminal->using_alt_screen = false;
+  terminal->window_title[0] = '\0';
+  terminal->title_dirty = false;
+  terminal->partial_len = 0;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
 }
@@ -532,8 +535,65 @@ static int csi_param(Term_Token token, int default_val) {
   return val <= 0 ? default_val : val;
 }
 
+static int incomplete_escape_tail(const char *buf, int len) {
+  int i = len - 1;
+  while (i >= 0 && (unsigned char)buf[i] != 0x1b) i--;
+  if (i < 0) return 0;
+
+  int have = len - i;
+  const char *p = buf + i;
+
+  if (have == 1) return 1;
+
+  unsigned char next = (unsigned char)p[1];
+  if (next == '[') {
+    int j = 2;
+    while (j < have && (unsigned char)p[j] >= 0x30 && (unsigned char)p[j] <= 0x3f) j++;
+    while (j < have && (unsigned char)p[j] >= 0x20 && (unsigned char)p[j] <= 0x2f) j++;
+    if (j < have && (unsigned char)p[j] >= 0x40 && (unsigned char)p[j] <= 0x7e) return 0;
+    return have;
+  } else if (next == ']') {
+    for (int j = 2; j < have; j++) {
+      if ((unsigned char)p[j] == 0x07) return 0;
+      if (j + 1 < have && p[j] == '\x1b' && p[j + 1] == '\\') return 0;
+    }
+    return have;
+  } else if (next == '(' || next == ')' || next == '*' || next == '+') {
+    return (have >= 3) ? 0 : have;
+  }
+  return 0;
+}
+
 void write_terminal(Terminal *terminal, const char *text, int length) {
-  Term_Tokens *tokens = tokenize(text, length);
+  char *combined = NULL;
+  int combined_len = length;
+
+  if (terminal->partial_len > 0) {
+    combined_len = terminal->partial_len + length;
+    combined = malloc(combined_len);
+    if (!combined) return;
+    memcpy(combined, terminal->partial_buf, terminal->partial_len);
+    memcpy(combined + terminal->partial_len, text, length);
+    text = combined;
+    terminal->partial_len = 0;
+  }
+
+  int tail = incomplete_escape_tail(text, combined_len);
+  if (tail >= combined_len) {
+    int save = tail < (int)sizeof(terminal->partial_buf) ? tail : (int)sizeof(terminal->partial_buf) - 1;
+    memcpy(terminal->partial_buf, text, save);
+    terminal->partial_len = save;
+    free(combined);
+    return;
+  }
+  if (tail > 0) {
+    int save = tail < (int)sizeof(terminal->partial_buf) ? tail : (int)sizeof(terminal->partial_buf) - 1;
+    memcpy(terminal->partial_buf, text + combined_len - tail, save);
+    terminal->partial_len = save;
+    combined_len -= tail;
+  }
+
+  Term_Tokens *tokens = tokenize(text, combined_len);
   int width = terminal->width;
   int height = terminal->height;
 
@@ -720,6 +780,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
   free(tokens->tokens);
   free(tokens);
+  free(combined);
 }
 
 void write_string(Terminal *terminal, const char *str) {
