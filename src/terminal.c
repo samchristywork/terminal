@@ -178,8 +178,10 @@ void handle_newline(Term_Screen *screen, int width, int height) {
 void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
                int start_index, int length) {
   if (tokens->count % 128 == 0) {
-    tokens->tokens = (Term_Token *)realloc(
+    Term_Token *new_tokens = (Term_Token *)realloc(
         tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
+    if (!new_tokens) return;
+    tokens->tokens = new_tokens;
   }
   if (length > 255) length = 255;
   Term_Token *token = &tokens->tokens[tokens->count++];
