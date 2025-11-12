@@ -276,7 +276,7 @@ static void build_selection_text(GuiContext *gui, Terminal *terminal) {
   Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   Term_Scrollback *sb = &scr->scrollback;
 
-  int max_len = (terminal->width + 1) * (end_y - start_y + 1) + 1;
+  int max_len = (terminal->width * 6 + 1) * (end_y - start_y + 1) + 1;
   char *buf = malloc(max_len);
   if (!buf) return;
   int pos = 0;
@@ -295,7 +295,12 @@ static void build_selection_text(GuiContext *gui, Terminal *terminal) {
       } else {
         cell = scr->lines[combined - sb->count].cells[x];
       }
-      buf[pos++] = (cell.length > 0) ? cell.data[0] : ' ';
+      if (cell.length > 0) {
+        memcpy(buf + pos, cell.data, cell.length);
+        pos += cell.length;
+      } else {
+        buf[pos++] = ' ';
+      }
     }
     if (combined < end_y) buf[pos++] = '\n';
   }
