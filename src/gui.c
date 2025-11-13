@@ -351,7 +351,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       int pixel_y = y * (gui->char_height) + 10;
 
       unsigned long bg_color = gui->default_bg;
-      if (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) {
+      if (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
@@ -364,11 +364,11 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       unsigned long text_color;
       if (reverse) {
         text_color = bg_color;
-        bg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB)
+        bg_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
                        ? get_color_pixel(gui, cell.attr.fg)
                        : gui->default_fg;
       } else {
-        text_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB)
+        text_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
                          ? get_color_pixel(gui, cell.attr.fg)
                          : gui->default_fg;
       }
@@ -382,9 +382,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
 
         if (reverse) {
-          fg_color = (cell.attr.bg.color != 0 || cell.attr.bg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_default_bg;
+          fg_color = (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_default_bg;
         } else {
-          fg_color = (cell.attr.fg.color != 0 || cell.attr.fg.type == COLOR_RGB) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_default_fg;
+          fg_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_default_fg;
         }
 
         XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
