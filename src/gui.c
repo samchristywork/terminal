@@ -228,7 +228,18 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
       return &xft_color_cache[idx];
     }
   } else if (color.type == COLOR_RGB) {
-    static XftColor xft_rgb_color;
+    static XftColor rgb_cache[64];
+    static int rgb_cache_keys[64];
+    static bool rgb_cache_valid[64];
+    static int rgb_cache_next = 0;
+
+    int key = (color.rgb.red << 16) | (color.rgb.green << 8) | color.rgb.blue;
+    for (int i = 0; i < 64; i++) {
+      if (rgb_cache_valid[i] && rgb_cache_keys[i] == key)
+        return &rgb_cache[i];
+    }
+    int slot = rgb_cache_next;
+    rgb_cache_next = (rgb_cache_next + 1) % 64;
     XRenderColor xrender_color;
     xrender_color.red   = (unsigned short)(color.rgb.red   << 8);
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
@@ -236,8 +247,10 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
     xrender_color.alpha = 0xffff;
     XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
                        DefaultColormap(gui->display, gui->screen),
-                       &xrender_color, &xft_rgb_color);
-    return &xft_rgb_color;
+                       &xrender_color, &rgb_cache[slot]);
+    rgb_cache_keys[slot] = key;
+    rgb_cache_valid[slot] = true;
+    return &rgb_cache[slot];
   }
   return &gui->xft_white;
 }
@@ -598,7 +611,6 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
 void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
   switch (event->type) {
   case Expose:
-    read_shell_output(gui, terminal);
     draw_terminal(gui, terminal);
     break;
   case ConfigureNotify: {
