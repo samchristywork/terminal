@@ -49,7 +49,6 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->window_title[0] = '\0';
   terminal->title_dirty = false;
   terminal->partial_len = 0;
-  terminal->cursor_hidden = false;
   terminal->bracketed_paste = false;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
@@ -676,9 +675,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     } else if (token.type == TOKEN_MAIN_SCREEN) {
       terminal->using_alt_screen = false;
     } else if (token.type == TOKEN_CURSOR_HIDE) {
-      terminal->cursor_hidden = true;
+      screen->cursor_hidden = true;
     } else if (token.type == TOKEN_CURSOR_SHOW) {
-      terminal->cursor_hidden = false;
+      screen->cursor_hidden = false;
     } else if (token.type == TOKEN_BRACKETED_PASTE_ON) {
       terminal->bracketed_paste = true;
     } else if (token.type == TOKEN_BRACKETED_PASTE_OFF) {

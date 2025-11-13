@@ -66,6 +66,7 @@ typedef struct {
   int scroll_offset;
   int scroll_top;
   int scroll_bot;
+  bool cursor_hidden;
 } Term_Screen;
 
 typedef struct {
@@ -78,7 +79,6 @@ typedef struct {
   bool title_dirty;
   char partial_buf[64];
   int partial_len;
-  bool cursor_hidden;
   bool bracketed_paste;
 } Terminal;
 
