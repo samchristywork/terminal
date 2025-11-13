@@ -78,6 +78,7 @@ typedef struct {
   bool title_dirty;
   char partial_buf[64];
   int partial_len;
+  bool cursor_hidden;
 } Terminal;
 
 typedef enum {
@@ -94,6 +95,8 @@ typedef enum {
   TOKEN_ERASE_SCROLLBACK, // ESC[3J
   TOKEN_ALT_SCREEN,       // ESC[?1049h
   TOKEN_MAIN_SCREEN,      // ESC[?1049l
+  TOKEN_CURSOR_HIDE,      // ESC[?25l
+  TOKEN_CURSOR_SHOW,      // ESC[?25h
   TOKEN_TAB,              // \t
   TOKEN_BACKSPACE,        // \b or 0x7f
   TOKEN_OSC,              // ESC ] ... BEL/ST

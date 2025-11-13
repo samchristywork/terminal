@@ -49,6 +49,7 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->window_title[0] = '\0';
   terminal->title_dirty = false;
   terminal->partial_len = 0;
+  terminal->cursor_hidden = false;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
 }
@@ -193,6 +194,10 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
       add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
+    } else if (matches(text, length, i, "\x1b[?25l", &len)) {
+      add_token(tokens, TOKEN_CURSOR_HIDE, text, i, len);
+    } else if (matches(text, length, i, "\x1b[?25h", &len)) {
+      add_token(tokens, TOKEN_CURSOR_SHOW, text, i, len);
     } else if (matches(text, length, i, "\x1b" "7", &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b" "8", &len)) {
@@ -665,6 +670,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       terminal->using_alt_screen = true;
     } else if (token.type == TOKEN_MAIN_SCREEN) {
       terminal->using_alt_screen = false;
+    } else if (token.type == TOKEN_CURSOR_HIDE) {
+      terminal->cursor_hidden = true;
+    } else if (token.type == TOKEN_CURSOR_SHOW) {
+      terminal->cursor_hidden = false;
     } else if (token.type == TOKEN_TAB) {
       int next_tab_stop = ((cursor->x / 8) + 1) * 8;
       if (next_tab_stop >= width) {

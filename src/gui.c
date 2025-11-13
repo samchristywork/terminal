@@ -355,7 +355,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
-      bool is_cursor = gui->cursor_visible && (scroll_offset == 0) &&
+      bool is_cursor = gui->cursor_visible && !terminal->cursor_hidden &&
+          (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       bool in_selection = cell_in_selection(gui, x, combined);
       bool reverse = cell.attr.reverse || is_cursor || in_selection;
