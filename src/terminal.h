@@ -79,6 +79,7 @@ typedef struct {
   char partial_buf[64];
   int partial_len;
   bool cursor_hidden;
+  bool bracketed_paste;
 } Terminal;
 
 typedef enum {
@@ -97,6 +98,8 @@ typedef enum {
   TOKEN_MAIN_SCREEN,      // ESC[?1049l
   TOKEN_CURSOR_HIDE,      // ESC[?25l
   TOKEN_CURSOR_SHOW,      // ESC[?25h
+  TOKEN_BRACKETED_PASTE_ON,  // ESC[?2004h
+  TOKEN_BRACKETED_PASTE_OFF, // ESC[?2004l
   TOKEN_TAB,              // \t
   TOKEN_BACKSPACE,        // \b or 0x7f
   TOKEN_OSC,              // ESC ] ... BEL/ST

@@ -840,7 +840,11 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
                        0, 65536, True, AnyPropertyType,
                        &actual_type, &actual_format, &nitems, &bytes_after, &data);
     if (data) {
+      if (terminal->bracketed_paste)
+        write(gui->pipe_fd, "\x1b[200~", 6);
       write(gui->pipe_fd, data, nitems);
+      if (terminal->bracketed_paste)
+        write(gui->pipe_fd, "\x1b[201~", 6);
       XFree(data);
     }
     break;
