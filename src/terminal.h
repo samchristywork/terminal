@@ -64,6 +64,8 @@ typedef struct {
   Term_Line *lines;
   Term_Scrollback scrollback;
   int scroll_offset;
+  int scroll_top;
+  int scroll_bot;
 } Term_Screen;
 
 typedef struct {

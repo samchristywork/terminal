@@ -21,6 +21,8 @@ void init_screen(Term_Screen *screen, int width, int height) {
   screen->scrollback.count = 0;
   screen->scrollback.head = 0;
   screen->scroll_offset = 0;
+  screen->scroll_top = 0;
+  screen->scroll_bot = height - 1;
 }
 
 void free_screen(Term_Screen *screen, int height) {
@@ -52,36 +54,43 @@ void init_terminal(Terminal *terminal, int width, int height) {
 }
 
 void scroll_screen(Term_Screen *screen, int width, int height) {
-  Term_Scrollback *sb = &screen->scrollback;
-  int idx;
-  if (sb->count < sb->capacity) {
-    idx = (sb->head + sb->count) % sb->capacity;
-    sb->count++;
-  } else {
-    idx = sb->head;
-    free(sb->lines[idx]);
-    sb->head = (sb->head + 1) % sb->capacity;
-  }
-  sb->lines[idx] = malloc(width * sizeof(Term_Cell));
-  memcpy(sb->lines[idx], screen->lines[0].cells, width * sizeof(Term_Cell));
-  sb->widths[idx] = width;
+  (void)height;
+  int top = screen->scroll_top;
+  int bot = screen->scroll_bot;
 
-  for (int j = 0; j < height - 1; j++) {
+  if (top == 0) {
+    Term_Scrollback *sb = &screen->scrollback;
+    int idx;
+    if (sb->count < sb->capacity) {
+      idx = (sb->head + sb->count) % sb->capacity;
+      sb->count++;
+    } else {
+      idx = sb->head;
+      free(sb->lines[idx]);
+      sb->head = (sb->head + 1) % sb->capacity;
+    }
+    sb->lines[idx] = malloc(width * sizeof(Term_Cell));
+    memcpy(sb->lines[idx], screen->lines[top].cells, width * sizeof(Term_Cell));
+    sb->widths[idx] = width;
+  }
+
+  for (int j = top; j < bot; j++) {
     for (int k = 0; k < width; k++) {
       screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
     }
   }
   for (int k = 0; k < width; k++) {
-    memset(&screen->lines[height - 1].cells[k], 0, sizeof(Term_Cell));
+    memset(&screen->lines[bot].cells[k], 0, sizeof(Term_Cell));
   }
 }
 
 
 void handle_newline(Term_Screen *screen, int width, int height) {
-  screen->cursor.y++;
-  if (screen->cursor.y >= height) {
-    screen->cursor.y = height - 1;
+  if (screen->cursor.y == screen->scroll_bot) {
     scroll_screen(screen, width, height);
+  } else {
+    screen->cursor.y++;
+    if (screen->cursor.y >= height) screen->cursor.y = height - 1;
   }
 }
 
@@ -562,21 +571,38 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       } else if (final == '8' || final == 'u') {
         *cursor = screen->saved_cursor;
       } else if (final == 'L') {
-        int rows = (n < height - cursor->y) ? n : height - cursor->y;
-        for (int j = height - 1; j >= cursor->y + rows; j--)
+        int bot = screen->scroll_bot;
+        int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
+        for (int j = bot; j >= cursor->y + rows; j--)
           memcpy(screen->lines[j].cells, screen->lines[j - rows].cells,
                  width * sizeof(Term_Cell));
         for (int j = cursor->y; j < cursor->y + rows; j++)
           for (int k = 0; k < width; k++)
             memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
       } else if (final == 'M') {
-        int rows = (n < height - cursor->y) ? n : height - cursor->y;
-        for (int j = cursor->y; j < height - rows; j++)
+        int bot = screen->scroll_bot;
+        int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
+        for (int j = cursor->y; j <= bot - rows; j++)
           memcpy(screen->lines[j].cells, screen->lines[j + rows].cells,
                  width * sizeof(Term_Cell));
-        for (int j = height - rows; j < height; j++)
+        for (int j = bot - rows + 1; j <= bot; j++)
           for (int k = 0; k < width; k++)
             memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == 'r') {
+        const char *p = token.value + 2;
+        const char *end = token.value + token.length - 1;
+        int top = 0, bot = 0;
+        while (p < end && *p != ';') top = top * 10 + (*p++ - '0');
+        if (p < end) p++;
+        while (p < end) bot = bot * 10 + (*p++ - '0');
+        if (top < 1) top = 1;
+        if (bot < 1 || bot > height) bot = height;
+        if (top < bot) {
+          screen->scroll_top = top - 1;
+          screen->scroll_bot = bot - 1;
+        }
+        cursor->x = 0;
+        cursor->y = 0;
       } else if (final == '@') {
         int cols = (n < width - cursor->x) ? n : width - cursor->x;
         int move = width - cursor->x - cols;
@@ -651,13 +677,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         cursor->x--;
       }
     } else if (token.type == TOKEN_REVERSE_INDEX) {
-      if (cursor->y > 0) {
+      if (cursor->y > screen->scroll_top) {
         cursor->y--;
-      } else {
-        for (int j = height - 1; j > 0; j--)
+      } else if (cursor->y == screen->scroll_top) {
+        for (int j = screen->scroll_bot; j > screen->scroll_top; j--)
           memcpy(screen->lines[j].cells, screen->lines[j - 1].cells,
                  width * sizeof(Term_Cell));
-        memset(screen->lines[0].cells, 0, width * sizeof(Term_Cell));
+        memset(screen->lines[screen->scroll_top].cells, 0, width * sizeof(Term_Cell));
+      } else {
+        if (cursor->y > 0) cursor->y--;
       }
     } else if (token.type == TOKEN_OSC) {
       // Parse: ESC ] cmd ; text BEL/ST
@@ -691,6 +719,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
 void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
   screen->scroll_offset = 0;
+  screen->scroll_top = 0;
+  screen->scroll_bot = new_height - 1;
 
   Term_Line *new_lines = (Term_Line *)malloc(new_height * sizeof(Term_Line));
 
