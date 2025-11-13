@@ -690,12 +690,6 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
 
 void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
-  Term_Scrollback *sb = &screen->scrollback;
-  for (int i = 0; i < sb->count; i++) {
-    free(sb->lines[(sb->head + i) % sb->capacity]);
-  }
-  sb->count = 0;
-  sb->head = 0;
   screen->scroll_offset = 0;
 
   Term_Line *new_lines = (Term_Line *)malloc(new_height * sizeof(Term_Line));
