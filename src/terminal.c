@@ -5,89 +5,6 @@
 
 #include "terminal.h"
 
-const char INVERT_COLORS[] = "\x1b[7m";
-const char RESET_COLORS[] = "\x1b[0m";
-
-void print_cursor_data(Term_Cursor cursor) {
-  printf("Cursor: x=%d, y=%d, attr={fg=%d, bg=%d, bold=%d, underline=%d, "
-         "reverse=%d}\n",
-         cursor.x, cursor.y, cursor.attr.fg.color, cursor.attr.bg.color,
-         cursor.attr.bold, cursor.attr.underline, cursor.attr.reverse);
-}
-
-void print_cell_color(Term_Attr attr) {
-  if ((attr.fg.type == COLOR_DEFAULT || attr.fg.type == COLOR_BRIGHT) &&
-      attr.fg.color != 0) {
-    printf("\x1b[%dm", attr.fg.color);
-  }
-  if ((attr.bg.type == COLOR_DEFAULT || attr.bg.type == COLOR_BRIGHT) &&
-      attr.bg.color != 0) {
-    printf("\x1b[%dm", attr.bg.color);
-  }
-  if (attr.fg.type == COLOR_256) {
-    printf("\x1b[38;5;%dm", attr.fg.color);
-  }
-  if (attr.bg.type == COLOR_256) {
-    printf("\x1b[48;5;%dm", attr.bg.color);
-  }
-  if (attr.fg.type == COLOR_RGB) {
-    printf("\x1b[38;2;%d;%d;%dm", attr.fg.rgb.red, attr.fg.rgb.green, attr.fg.rgb.blue);
-  }
-  if (attr.bg.type == COLOR_RGB) {
-    printf("\x1b[48;2;%d;%d;%dm", attr.bg.rgb.red, attr.bg.rgb.green, attr.bg.rgb.blue);
-  }
-  if (attr.bold) {
-    printf("\x1b[1m");
-  }
-  if (attr.underline) {
-    printf("\x1b[4m");
-  }
-  if (attr.reverse) {
-    printf("\x1b[7m");
-  }
-}
-
-void print_screen(Term_Screen *screen, int width, int height) {
-#ifdef DEBUG
-  print_cursor_data(screen->cursor);
-#endif
-  for (int i = 0; i < width + 2; i++) {
-    printf("-");
-  }
-  printf("\n");
-  for (int i = 0; i < height; i++) {
-    printf("|");
-    for (int j = 0; j < width; j++) {
-      Term_Cursor c = screen->cursor;
-      Term_Cell cell = screen->lines[i].cells[j];
-      print_cell_color(cell.attr);
-      if (i == c.y && j == c.x) {
-        // TODO: This is incorrect if cell is already reverse
-        printf(INVERT_COLORS);
-      }
-      if (cell.length > 0) {
-        // TODO: handle multi-byte characters
-        printf("%c", cell.data[0]);
-      } else {
-        printf(" ");
-      }
-      printf(RESET_COLORS);
-    }
-    printf("|\n");
-  }
-  for (int i = 0; i < width + 2; i++) {
-    printf("-");
-  }
-  printf("\n");
-}
-
-void print_terminal(Terminal *terminal) {
-  if (terminal->using_alt_screen) {
-    print_screen(&terminal->alt_screen, terminal->width, terminal->height);
-  } else {
-    print_screen(&terminal->screen, terminal->width, terminal->height);
-  }
-}
 
 void init_screen(Term_Screen *screen, int width, int height) {
   memset(&screen->cursor, 0, sizeof(Term_Cursor));
@@ -159,13 +76,6 @@ void scroll_screen(Term_Screen *screen, int width, int height) {
   }
 }
 
-void scroll_terminal(Terminal *terminal) {
-  if (terminal->using_alt_screen) {
-    scroll_screen(&terminal->alt_screen, terminal->width, terminal->height);
-  } else {
-    scroll_screen(&terminal->screen, terminal->width, terminal->height);
-  }
-}
 
 void handle_newline(Term_Screen *screen, int width, int height) {
   screen->cursor.y++;
@@ -778,9 +688,6 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   free(combined);
 }
 
-void write_string(Terminal *terminal, const char *str) {
-  write_terminal(terminal, str, strlen(str));
-}
 
 void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
   Term_Scrollback *sb = &screen->scrollback;
