@@ -50,6 +50,8 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->title_dirty = false;
   terminal->partial_len = 0;
   terminal->bracketed_paste = false;
+  terminal->mouse_mode = 0;
+  terminal->mouse_sgr = false;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
 }
@@ -79,6 +81,8 @@ void reset_terminal(Terminal *terminal) {
   terminal->title_dirty = false;
   terminal->partial_len = 0;
   terminal->bracketed_paste = false;
+  terminal->mouse_mode = 0;
+  terminal->mouse_sgr = false;
 }
 
 void scroll_screen(Term_Screen *screen, int width, int height) {
@@ -658,6 +662,16 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
                   move * sizeof(Term_Cell));
         for (int k = width - cols; k < width; k++)
           memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == 'h' || final == 'l') {
+        bool enable = (final == 'h');
+        if (starts_with(token.value, token.length, "\x1b[?1000"))
+          terminal->mouse_mode = enable ? 1 : 0;
+        else if (starts_with(token.value, token.length, "\x1b[?1002"))
+          terminal->mouse_mode = enable ? 2 : 0;
+        else if (starts_with(token.value, token.length, "\x1b[?1003"))
+          terminal->mouse_mode = enable ? 3 : 0;
+        else if (starts_with(token.value, token.length, "\x1b[?1006"))
+          terminal->mouse_sgr = enable;
       } else {
         modify_cursor(&cursor, token);
       }

@@ -80,6 +80,8 @@ typedef struct {
   char partial_buf[64];
   int partial_len;
   bool bracketed_paste;
+  int mouse_mode;  // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
+  bool mouse_sgr;  // SGR extended coordinates (1006)
 } Terminal;
 
 typedef enum {

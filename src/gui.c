@@ -495,7 +495,8 @@ int init_gui(GuiContext *gui, Args *args) {
 
   XSelectInput(gui->display, gui->window,
                ExposureMask | KeyPressMask | ButtonPressMask | ButtonReleaseMask |
-               Button1MotionMask | StructureNotifyMask);
+               Button1MotionMask | Button2MotionMask | Button3MotionMask |
+               PointerMotionMask | StructureNotifyMask);
 
   XStoreName(gui->display, gui->window, "Terminal GUI");
 
@@ -610,6 +611,24 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
   while ((bytes_read = read(gui->pipe_fd, buffer, sizeof(buffer))) > 0) {
     write_terminal(terminal, buffer, bytes_read);
   }
+}
+
+static void send_mouse_event(GuiContext *gui, Terminal *terminal,
+                             int btn, int x, int y, bool release) {
+  char buf[32];
+  int len;
+  if (terminal->mouse_sgr) {
+    len = snprintf(buf, sizeof(buf), "\x1b[<%d;%d;%d%c",
+                   btn, x + 1, y + 1, release ? 'm' : 'M');
+  } else {
+    if (x + 1 > 223 || y + 1 > 223) return;
+    buf[0] = '\x1b'; buf[1] = '['; buf[2] = 'M';
+    buf[3] = (char)((release ? 3 : btn) + 32);
+    buf[4] = (char)(x + 1 + 32);
+    buf[5] = (char)(y + 1 + 32);
+    len = 6;
+  }
+  write(gui->pipe_fd, buf, len);
 }
 
 void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
@@ -742,13 +761,32 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     Term_Screen *scr = terminal->using_alt_screen
                            ? &terminal->alt_screen : &terminal->screen;
     int max_scroll = scr->scrollback.count;
+    int cell_x = (event->xbutton.x - 10) / gui->char_width;
+    int cell_y = (event->xbutton.y - 10) / gui->char_height;
+    if (cell_x < 0) cell_x = 0;
+    if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+    if (cell_y < 0) cell_y = 0;
+    if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+    bool shift = (event->xbutton.state & ShiftMask) != 0;
+
+    if (terminal->mouse_mode >= 1 && !shift) {
+      int btn = -1;
+      switch (event->xbutton.button) {
+        case Button1: btn = 0; break;
+        case Button2: btn = 1; break;
+        case Button3: btn = 2; break;
+        case Button4: btn = 64; break;
+        case Button5: btn = 65; break;
+      }
+      if (btn >= 0) {
+        if (event->xbutton.state & Mod1Mask)    btn |= 8;
+        if (event->xbutton.state & ControlMask) btn |= 16;
+        send_mouse_event(gui, terminal, btn, cell_x, cell_y, false);
+        break;
+      }
+    }
+
     if (event->xbutton.button == Button1) {
-      int cell_x = (event->xbutton.x - 10) / gui->char_width;
-      int cell_y = (event->xbutton.y - 10) / (gui->char_height);
-      if (cell_x < 0) cell_x = 0;
-      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-      if (cell_y < 0) cell_y = 0;
-      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
       int anchor_row = scr->scrollback.count - scr->scroll_offset + cell_y;
       gui->selecting = true;
       gui->has_selection = false;
@@ -772,38 +810,77 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     break;
   }
   case ButtonRelease: {
-    if (event->xbutton.button == Button1 && gui->selecting) {
-      Term_Screen *scr = terminal->using_alt_screen
-                             ? &terminal->alt_screen : &terminal->screen;
-      int cell_x = (event->xbutton.x - 10) / gui->char_width;
-      int cell_y = (event->xbutton.y - 10) / (gui->char_height);
-      if (cell_x < 0) cell_x = 0;
-      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-      if (cell_y < 0) cell_y = 0;
-      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
-      int cur_row = scr->scrollback.count - scr->scroll_offset + cell_y;
-      gui->sel_cur_x = cell_x;
-      gui->sel_cur_y = cur_row;
-      gui->selecting = false;
-      gui->has_selection = (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cur_row);
-      if (gui->has_selection) {
-        build_selection_text(gui, terminal);
-        XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+    if (event->xbutton.button == Button1) {
+      bool shift = (event->xbutton.state & ShiftMask) != 0;
+
+      if (terminal->mouse_mode >= 1 && !shift) {
+        int cell_x = (event->xbutton.x - 10) / gui->char_width;
+        int cell_y = (event->xbutton.y - 10) / gui->char_height;
+        if (cell_x < 0) cell_x = 0;
+        if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+        if (cell_y < 0) cell_y = 0;
+        if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+        int btn = 0;
+        if (event->xbutton.state & Mod1Mask)    btn |= 8;
+        if (event->xbutton.state & ControlMask) btn |= 16;
+        send_mouse_event(gui, terminal, btn, cell_x, cell_y, true);
+        break;
       }
-      draw_terminal(gui, terminal);
+
+      if (gui->selecting) {
+        Term_Screen *scr = terminal->using_alt_screen
+                               ? &terminal->alt_screen : &terminal->screen;
+        int cell_x = (event->xbutton.x - 10) / gui->char_width;
+        int cell_y = (event->xbutton.y - 10) / gui->char_height;
+        if (cell_x < 0) cell_x = 0;
+        if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+        if (cell_y < 0) cell_y = 0;
+        if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+        int cur_row = scr->scrollback.count - scr->scroll_offset + cell_y;
+        gui->sel_cur_x = cell_x;
+        gui->sel_cur_y = cur_row;
+        gui->selecting = false;
+        gui->has_selection = (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cur_row);
+        if (gui->has_selection) {
+          build_selection_text(gui, terminal);
+          XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+        }
+        draw_terminal(gui, terminal);
+      }
     }
     break;
   }
   case MotionNotify: {
+    int cell_x = (event->xmotion.x - 10) / gui->char_width;
+    int cell_y = (event->xmotion.y - 10) / gui->char_height;
+    if (cell_x < 0) cell_x = 0;
+    if (cell_x >= terminal->width) cell_x = terminal->width - 1;
+    if (cell_y < 0) cell_y = 0;
+    if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+    bool shift = (event->xmotion.state & ShiftMask) != 0;
+
+    if (terminal->mouse_mode >= 1 && !shift) {
+      bool btn1 = (event->xmotion.state & Button1Mask) != 0;
+      bool btn2 = (event->xmotion.state & Button2Mask) != 0;
+      bool btn3 = (event->xmotion.state & Button3Mask) != 0;
+      bool any_btn = btn1 || btn2 || btn3;
+      bool should_report = (terminal->mouse_mode >= 3) ||
+                            (terminal->mouse_mode >= 2 && any_btn);
+      if (should_report) {
+        int btn = 32;
+        if (btn1)      btn = 32 + 0;
+        else if (btn2) btn = 32 + 1;
+        else if (btn3) btn = 32 + 2;
+        if (event->xmotion.state & Mod1Mask)    btn |= 8;
+        if (event->xmotion.state & ControlMask) btn |= 16;
+        send_mouse_event(gui, terminal, btn, cell_x, cell_y, false);
+        break;
+      }
+    }
+
     if (gui->selecting) {
       Term_Screen *scr = terminal->using_alt_screen
                              ? &terminal->alt_screen : &terminal->screen;
-      int cell_x = (event->xmotion.x - 10) / gui->char_width;
-      int cell_y = (event->xmotion.y - 10) / (gui->char_height);
-      if (cell_x < 0) cell_x = 0;
-      if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-      if (cell_y < 0) cell_y = 0;
-      if (cell_y >= terminal->height) cell_y = terminal->height - 1;
       gui->sel_cur_x = cell_x;
       gui->sel_cur_y = scr->scrollback.count - scr->scroll_offset + cell_y;
       gui->has_selection = true;
