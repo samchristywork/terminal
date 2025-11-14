@@ -54,6 +54,33 @@ void init_terminal(Terminal *terminal, int width, int height) {
   init_screen(&terminal->alt_screen, width, height);
 }
 
+static void reset_screen(Term_Screen *screen, int width, int height) {
+  memset(&screen->cursor, 0, sizeof(Term_Cursor));
+  memset(&screen->saved_cursor, 0, sizeof(Term_Cursor));
+  for (int i = 0; i < height; i++)
+    for (int j = 0; j < width; j++)
+      memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
+  Term_Scrollback *sb = &screen->scrollback;
+  for (int i = 0; i < sb->count; i++)
+    free(sb->lines[(sb->head + i) % sb->capacity]);
+  sb->count = 0;
+  sb->head = 0;
+  screen->scroll_offset = 0;
+  screen->scroll_top = 0;
+  screen->scroll_bot = height - 1;
+  screen->cursor_hidden = false;
+}
+
+void reset_terminal(Terminal *terminal) {
+  reset_screen(&terminal->screen, terminal->width, terminal->height);
+  reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
+  terminal->using_alt_screen = false;
+  terminal->window_title[0] = '\0';
+  terminal->title_dirty = false;
+  terminal->partial_len = 0;
+  terminal->bracketed_paste = false;
+}
+
 void scroll_screen(Term_Screen *screen, int width, int height) {
   (void)height;
   int top = screen->scroll_top;
@@ -208,14 +235,15 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\x1b" "M", &len)) {
       add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
+    } else if (matches(text, length, i, "\x1b" "c", &len)) {
+      add_token(tokens, TOKEN_FULL_RESET, text, i, len);
     } else if (i + 1 < length && text[i] == '\x1b' &&
-               (text[i + 1] == '=' || text[i + 1] == '>' ||
-                text[i + 1] == 'c')) {
-      len = 2; // application/normal keypad, full reset. Ignore
+               (text[i + 1] == '=' || text[i + 1] == '>')) {
+      len = 2; // application/normal keypad mode
     } else if (i + 2 < length && text[i] == '\x1b' &&
                (text[i + 1] == '(' || text[i + 1] == ')' ||
                 text[i + 1] == '*' || text[i + 1] == '+')) {
-      len = 3; // character set designation (e.g., \x1b(B) — ignore
+      len = 3; // character set designation (e.g., \x1b(B)
     } else if (is_osc_sequence(text, length, i, &len)) {
       add_token(tokens, TOKEN_OSC, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {
@@ -223,7 +251,7 @@ Term_Tokens *tokenize(const char *text, int length) {
     } else if (matches(text, length, i, "\t", &len)) {
       add_token(tokens, TOKEN_TAB, text, i, len);
     } else if (text[i] == '\x07') {
-      // Bell character - ignore
+      // Bell character
       len = 1;
     } else {
       int start = i;
@@ -682,6 +710,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       terminal->bracketed_paste = true;
     } else if (token.type == TOKEN_BRACKETED_PASTE_OFF) {
       terminal->bracketed_paste = false;
+    } else if (token.type == TOKEN_FULL_RESET) {
+      reset_terminal(terminal);
     } else if (token.type == TOKEN_TAB) {
       int next_tab_stop = ((cursor->x / 8) + 1) * 8;
       if (next_tab_stop >= width) {

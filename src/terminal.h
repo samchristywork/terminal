@@ -100,6 +100,7 @@ typedef enum {
   TOKEN_CURSOR_SHOW,      // ESC[?25h
   TOKEN_BRACKETED_PASTE_ON,  // ESC[?2004h
   TOKEN_BRACKETED_PASTE_OFF, // ESC[?2004l
+  TOKEN_FULL_RESET,          // ESC c (RIS)
   TOKEN_TAB,              // \t
   TOKEN_BACKSPACE,        // \b or 0x7f
   TOKEN_OSC,              // ESC ] ... BEL/ST
@@ -120,6 +121,8 @@ typedef struct {
 } Term_Tokens;
 
 void init_terminal(Terminal *terminal, int width, int height);
+
+void reset_terminal(Terminal *terminal);
 
 void free_terminal(Terminal *terminal);
 
