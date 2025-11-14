@@ -53,6 +53,12 @@ typedef struct {
   int selection_len;
   bool cursor_visible;
   struct timespec last_blink;
+  XftColor xft_color_cache[256];
+  bool xft_color_cached[256];
+  XftColor rgb_cache[64];
+  int rgb_cache_keys[64];
+  bool rgb_cache_valid[64];
+  int rgb_cache_next;
 } GuiContext;
 
 void init_colors(GuiContext *gui, Args *args) {
@@ -193,8 +199,6 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
              color.color <= 107) {
     return &gui->xft_colors[color.color - 100 + 8];
   } else if (color.type == COLOR_256) {
-    static XftColor xft_color_cache[256];
-    static bool xft_color_cached[256] = {false};
     int idx = color.color;
 
     if (idx >= 0 && idx < 256) {
@@ -202,7 +206,7 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
         return &gui->xft_colors[idx];
       }
 
-      if (!xft_color_cached[idx]) {
+      if (!gui->xft_color_cached[idx]) {
         XRenderColor xrender_color;
         unsigned long r, g, b;
 
@@ -222,24 +226,19 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
         xrender_color.alpha = 0xffff;
         XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
                            DefaultColormap(gui->display, gui->screen),
-                           &xrender_color, &xft_color_cache[idx]);
-        xft_color_cached[idx] = true;
+                           &xrender_color, &gui->xft_color_cache[idx]);
+        gui->xft_color_cached[idx] = true;
       }
-      return &xft_color_cache[idx];
+      return &gui->xft_color_cache[idx];
     }
   } else if (color.type == COLOR_RGB) {
-    static XftColor rgb_cache[64];
-    static int rgb_cache_keys[64];
-    static bool rgb_cache_valid[64];
-    static int rgb_cache_next = 0;
-
     int key = (color.rgb.red << 16) | (color.rgb.green << 8) | color.rgb.blue;
     for (int i = 0; i < 64; i++) {
-      if (rgb_cache_valid[i] && rgb_cache_keys[i] == key)
-        return &rgb_cache[i];
+      if (gui->rgb_cache_valid[i] && gui->rgb_cache_keys[i] == key)
+        return &gui->rgb_cache[i];
     }
-    int slot = rgb_cache_next;
-    rgb_cache_next = (rgb_cache_next + 1) % 64;
+    int slot = gui->rgb_cache_next;
+    gui->rgb_cache_next = (gui->rgb_cache_next + 1) % 64;
     XRenderColor xrender_color;
     xrender_color.red   = (unsigned short)(color.rgb.red   << 8);
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
@@ -247,10 +246,10 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
     xrender_color.alpha = 0xffff;
     XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
                        DefaultColormap(gui->display, gui->screen),
-                       &xrender_color, &rgb_cache[slot]);
-    rgb_cache_keys[slot] = key;
-    rgb_cache_valid[slot] = true;
-    return &rgb_cache[slot];
+                       &xrender_color, &gui->rgb_cache[slot]);
+    gui->rgb_cache_keys[slot] = key;
+    gui->rgb_cache_valid[slot] = true;
+    return &gui->rgb_cache[slot];
   }
   return &gui->xft_white;
 }
@@ -597,6 +596,10 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->cursor_visible = true;
   clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
 
+  memset(gui->xft_color_cached, 0, sizeof(gui->xft_color_cached));
+  memset(gui->rgb_cache_valid, 0, sizeof(gui->rgb_cache_valid));
+  gui->rgb_cache_next = 0;
+
   return 0;
 }
 
@@ -876,6 +879,15 @@ void cleanup_gui(GuiContext *gui) {
   XftColorFree(gui->display, visual, colormap, &gui->xft_black);
   XftColorFree(gui->display, visual, colormap, &gui->xft_default_fg);
   XftColorFree(gui->display, visual, colormap, &gui->xft_default_bg);
+
+  for (int i = 16; i < 256; i++) {
+    if (gui->xft_color_cached[i])
+      XftColorFree(gui->display, visual, colormap, &gui->xft_color_cache[i]);
+  }
+  for (int i = 0; i < 64; i++) {
+    if (gui->rgb_cache_valid[i])
+      XftColorFree(gui->display, visual, colormap, &gui->rgb_cache[i]);
+  }
 
   free(gui->selection_text);
 
