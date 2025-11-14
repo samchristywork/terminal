@@ -5,7 +5,6 @@
 
 #include "terminal.h"
 
-
 void init_screen(Term_Screen *screen, int width, int height) {
   memset(&screen->cursor, 0, sizeof(Term_Cursor));
   screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
@@ -31,7 +30,8 @@ void free_screen(Term_Screen *screen, int height) {
   }
   free(screen->lines);
   for (int i = 0; i < screen->scrollback.count; i++) {
-    free(screen->scrollback.lines[(screen->scrollback.head + i) % screen->scrollback.capacity]);
+    free(screen->scrollback.lines[(screen->scrollback.head + i) %
+                                  screen->scrollback.capacity]);
   }
   free(screen->scrollback.lines);
   free(screen->scrollback.widths);
@@ -116,13 +116,13 @@ void scroll_screen(Term_Screen *screen, int width, int height) {
   }
 }
 
-
 void handle_newline(Term_Screen *screen, int width, int height) {
   if (screen->cursor.y == screen->scroll_bot) {
     scroll_screen(screen, width, height);
   } else {
     screen->cursor.y++;
-    if (screen->cursor.y >= height) screen->cursor.y = height - 1;
+    if (screen->cursor.y >= height)
+      screen->cursor.y = height - 1;
   }
 }
 
@@ -131,10 +131,12 @@ void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
   if (tokens->count % 128 == 0) {
     Term_Token *new_tokens = (Term_Token *)realloc(
         tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
-    if (!new_tokens) return;
+    if (!new_tokens)
+      return;
     tokens->tokens = new_tokens;
   }
-  if (length > 255) length = 255;
+  if (length > 255)
+    length = 255;
   Term_Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
   token->length = length;
@@ -233,13 +235,25 @@ Term_Tokens *tokenize(const char *text, int length) {
       add_token(tokens, TOKEN_BRACKETED_PASTE_ON, text, i, len);
     } else if (matches(text, length, i, "\x1b[?2004l", &len)) {
       add_token(tokens, TOKEN_BRACKETED_PASTE_OFF, text, i, len);
-    } else if (matches(text, length, i, "\x1b" "7", &len)) {
+    } else if (matches(text, length, i,
+                       "\x1b"
+                       "7",
+                       &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-    } else if (matches(text, length, i, "\x1b" "8", &len)) {
+    } else if (matches(text, length, i,
+                       "\x1b"
+                       "8",
+                       &len)) {
       add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-    } else if (matches(text, length, i, "\x1b" "M", &len)) {
+    } else if (matches(text, length, i,
+                       "\x1b"
+                       "M",
+                       &len)) {
       add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
-    } else if (matches(text, length, i, "\x1b" "c", &len)) {
+    } else if (matches(text, length, i,
+                       "\x1b"
+                       "c",
+                       &len)) {
       add_token(tokens, TOKEN_FULL_RESET, text, i, len);
     } else if (i + 1 < length && text[i] == '\x1b' &&
                (text[i + 1] == '=' || text[i + 1] == '>')) {
@@ -264,7 +278,7 @@ Term_Tokens *tokenize(const char *text, int length) {
         if (c >= 0x20 && c < 0x7f) {
           i++;
         } else if (c >= 0x80) {
-          i++;  // multi-byte UTF-8 lead or continuation byte
+          i++; // multi-byte UTF-8 lead or continuation byte
         } else {
           break;
         }
@@ -294,7 +308,8 @@ void write_regular_cell(Term_Screen *screen, const char *data, int data_len,
 
   if (screen->cursor.y < height) {
     Term_Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
-    if (data_len > 6) data_len = 6;
+    if (data_len > 6)
+      data_len = 6;
     memcpy(cell->data, data, data_len);
     cell->length = data_len;
     cell->attr = attr;
@@ -395,28 +410,30 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   } else if (starts_with(token.value, token.length, "\x1b[38;2;")) {
     char params[32];
     int params_len = token.length - 8;
-    if (params_len <= 0 || params_len >= (int)sizeof(params)) return;
+    if (params_len <= 0 || params_len >= (int)sizeof(params))
+      return;
     memcpy(params, &token.value[7], params_len);
     params[params_len] = '\0';
     int r, g, b;
     if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
       (*cursor)->attr.fg.type = COLOR_RGB;
-      (*cursor)->attr.fg.rgb.red   = r < 0 ? 0 : (r > 255 ? 255 : r);
+      (*cursor)->attr.fg.rgb.red = r < 0 ? 0 : (r > 255 ? 255 : r);
       (*cursor)->attr.fg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
-      (*cursor)->attr.fg.rgb.blue  = b < 0 ? 0 : (b > 255 ? 255 : b);
+      (*cursor)->attr.fg.rgb.blue = b < 0 ? 0 : (b > 255 ? 255 : b);
     }
   } else if (starts_with(token.value, token.length, "\x1b[48;2;")) {
     char params[32];
     int params_len = token.length - 8;
-    if (params_len <= 0 || params_len >= (int)sizeof(params)) return;
+    if (params_len <= 0 || params_len >= (int)sizeof(params))
+      return;
     memcpy(params, &token.value[7], params_len);
     params[params_len] = '\0';
     int r, g, b;
     if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
       (*cursor)->attr.bg.type = COLOR_RGB;
-      (*cursor)->attr.bg.rgb.red   = r < 0 ? 0 : (r > 255 ? 255 : r);
+      (*cursor)->attr.bg.rgb.red = r < 0 ? 0 : (r > 255 ? 255 : r);
       (*cursor)->attr.bg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
-      (*cursor)->attr.bg.rgb.blue  = b < 0 ? 0 : (b > 255 ? 255 : b);
+      (*cursor)->attr.bg.rgb.blue = b < 0 ? 0 : (b > 255 ? 255 : b);
     }
   } else if (ends_with(token.value, token.length, 'm')) {
     if (token.length < 3) {
@@ -445,12 +462,17 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
     const char *end = token.value + token.length - 1; // points at 'H' or 'f'
 
     int row = 0, col = 0;
-    while (p < end && *p != ';') row = row * 10 + (*p++ - '0');
-    if (p < end) p++; // skip ';'
-    while (p < end) col = col * 10 + (*p++ - '0');
+    while (p < end && *p != ';')
+      row = row * 10 + (*p++ - '0');
+    if (p < end)
+      p++; // skip ';'
+    while (p < end)
+      col = col * 10 + (*p++ - '0');
 
-    if (row < 1) row = 1;
-    if (col < 1) col = 1;
+    if (row < 1)
+      row = 1;
+    if (col < 1)
+      col = 1;
 
     (*cursor)->y = row - 1;
     (*cursor)->x = col - 1;
@@ -470,11 +492,14 @@ void print_token(Term_Token t) {
 }
 
 static int csi_param(Term_Token token, int default_val) {
-  if (token.length < 3) return default_val;
+  if (token.length < 3)
+    return default_val;
   char buf[32];
   int param_len = token.length - 3;
-  if (param_len <= 0) return default_val;
-  if (param_len >= (int)sizeof(buf)) param_len = (int)sizeof(buf) - 1;
+  if (param_len <= 0)
+    return default_val;
+  if (param_len >= (int)sizeof(buf))
+    param_len = (int)sizeof(buf) - 1;
   memcpy(buf, &token.value[2], param_len);
   buf[param_len] = '\0';
   int val = atoi(buf);
@@ -483,25 +508,35 @@ static int csi_param(Term_Token token, int default_val) {
 
 static int incomplete_escape_tail(const char *buf, int len) {
   int i = len - 1;
-  while (i >= 0 && (unsigned char)buf[i] != 0x1b) i--;
-  if (i < 0) return 0;
+  while (i >= 0 && (unsigned char)buf[i] != 0x1b)
+    i--;
+  if (i < 0)
+    return 0;
 
   int have = len - i;
   const char *p = buf + i;
 
-  if (have == 1) return 1;
+  if (have == 1)
+    return 1;
 
   unsigned char next = (unsigned char)p[1];
   if (next == '[') {
     int j = 2;
-    while (j < have && (unsigned char)p[j] >= 0x30 && (unsigned char)p[j] <= 0x3f) j++;
-    while (j < have && (unsigned char)p[j] >= 0x20 && (unsigned char)p[j] <= 0x2f) j++;
-    if (j < have && (unsigned char)p[j] >= 0x40 && (unsigned char)p[j] <= 0x7e) return 0;
+    while (j < have && (unsigned char)p[j] >= 0x30 &&
+           (unsigned char)p[j] <= 0x3f)
+      j++;
+    while (j < have && (unsigned char)p[j] >= 0x20 &&
+           (unsigned char)p[j] <= 0x2f)
+      j++;
+    if (j < have && (unsigned char)p[j] >= 0x40 && (unsigned char)p[j] <= 0x7e)
+      return 0;
     return have;
   } else if (next == ']') {
     for (int j = 2; j < have; j++) {
-      if ((unsigned char)p[j] == 0x07) return 0;
-      if (j + 1 < have && p[j] == '\x1b' && p[j + 1] == '\\') return 0;
+      if ((unsigned char)p[j] == 0x07)
+        return 0;
+      if (j + 1 < have && p[j] == '\x1b' && p[j + 1] == '\\')
+        return 0;
     }
     return have;
   } else if (next == '(' || next == ')' || next == '*' || next == '+') {
@@ -517,7 +552,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   if (terminal->partial_len > 0) {
     combined_len = terminal->partial_len + length;
     combined = malloc(combined_len);
-    if (!combined) return;
+    if (!combined)
+      return;
     memcpy(combined, terminal->partial_buf, terminal->partial_len);
     memcpy(combined + terminal->partial_len, text, length);
     text = combined;
@@ -526,14 +562,18 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
   int tail = incomplete_escape_tail(text, combined_len);
   if (tail >= combined_len) {
-    int save = tail < (int)sizeof(terminal->partial_buf) ? tail : (int)sizeof(terminal->partial_buf) - 1;
+    int save = tail < (int)sizeof(terminal->partial_buf)
+                   ? tail
+                   : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text, save);
     terminal->partial_len = save;
     free(combined);
     return;
   }
   if (tail > 0) {
-    int save = tail < (int)sizeof(terminal->partial_buf) ? tail : (int)sizeof(terminal->partial_buf) - 1;
+    int save = tail < (int)sizeof(terminal->partial_buf)
+                   ? tail
+                   : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text + combined_len - tail, save);
     terminal->partial_len = save;
     combined_len -= tail;
@@ -543,7 +583,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   int width = terminal->width;
   int height = terminal->height;
 
-  Term_Screen *active = terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+  Term_Screen *active =
+      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   active->scroll_offset = 0;
 
 #ifdef DEBUG
@@ -564,12 +605,18 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       while (j < token.length) {
         unsigned char c = (unsigned char)token.value[j];
         int char_len;
-        if (c < 0x80)       char_len = 1;
-        else if (c < 0xE0)  char_len = 2;
-        else if (c < 0xF0)  char_len = 3;
-        else                char_len = 4;
-        if (j + char_len > token.length) char_len = token.length - j;
-        write_regular_cell(screen, &token.value[j], char_len, width, height, cursor->attr);
+        if (c < 0x80)
+          char_len = 1;
+        else if (c < 0xE0)
+          char_len = 2;
+        else if (c < 0xF0)
+          char_len = 3;
+        else
+          char_len = 4;
+        if (j + char_len > token.length)
+          char_len = token.length - j;
+        write_regular_cell(screen, &token.value[j], char_len, width, height,
+                           cursor->attr);
         j += char_len;
       }
     } else if (token.type == TOKEN_NEWLINE) {
@@ -581,32 +628,42 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       int n = csi_param(token, 1);
       if (final == 'A') {
         cursor->y -= n;
-        if (cursor->y < 0) cursor->y = 0;
+        if (cursor->y < 0)
+          cursor->y = 0;
       } else if (final == 'B') {
         cursor->y += n;
-        if (cursor->y >= height) cursor->y = height - 1;
+        if (cursor->y >= height)
+          cursor->y = height - 1;
       } else if (final == 'C') {
         cursor->x += n;
-        if (cursor->x >= width) cursor->x = width - 1;
+        if (cursor->x >= width)
+          cursor->x = width - 1;
       } else if (final == 'D') {
         cursor->x -= n;
-        if (cursor->x < 0) cursor->x = 0;
+        if (cursor->x < 0)
+          cursor->x = 0;
       } else if (final == 'E') {
         cursor->y += n;
-        if (cursor->y >= height) cursor->y = height - 1;
+        if (cursor->y >= height)
+          cursor->y = height - 1;
         cursor->x = 0;
       } else if (final == 'F') {
         cursor->y -= n;
-        if (cursor->y < 0) cursor->y = 0;
+        if (cursor->y < 0)
+          cursor->y = 0;
         cursor->x = 0;
       } else if (final == 'G') {
         cursor->x = n - 1;
-        if (cursor->x < 0) cursor->x = 0;
-        if (cursor->x >= width) cursor->x = width - 1;
+        if (cursor->x < 0)
+          cursor->x = 0;
+        if (cursor->x >= width)
+          cursor->x = width - 1;
       } else if (final == 'd') {
         cursor->y = n - 1;
-        if (cursor->y < 0) cursor->y = 0;
-        if (cursor->y >= height) cursor->y = height - 1;
+        if (cursor->y < 0)
+          cursor->y = 0;
+        if (cursor->y >= height)
+          cursor->y = height - 1;
       } else if (final == '7' || final == 's') {
         screen->saved_cursor = *cursor;
       } else if (final == '8' || final == 'u') {
@@ -633,11 +690,16 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         const char *p = token.value + 2;
         const char *end = token.value + token.length - 1;
         int top = 0, bot = 0;
-        while (p < end && *p != ';') top = top * 10 + (*p++ - '0');
-        if (p < end) p++;
-        while (p < end) bot = bot * 10 + (*p++ - '0');
-        if (top < 1) top = 1;
-        if (bot < 1 || bot > height) bot = height;
+        while (p < end && *p != ';')
+          top = top * 10 + (*p++ - '0');
+        if (p < end)
+          p++;
+        while (p < end)
+          bot = bot * 10 + (*p++ - '0');
+        if (top < 1)
+          top = 1;
+        if (bot < 1 || bot > height)
+          bot = height;
         if (top < bot) {
           screen->scroll_top = top - 1;
           screen->scroll_bot = bot - 1;
@@ -744,9 +806,11 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         for (int j = screen->scroll_bot; j > screen->scroll_top; j--)
           memcpy(screen->lines[j].cells, screen->lines[j - 1].cells,
                  width * sizeof(Term_Cell));
-        memset(screen->lines[screen->scroll_top].cells, 0, width * sizeof(Term_Cell));
+        memset(screen->lines[screen->scroll_top].cells, 0,
+               width * sizeof(Term_Cell));
       } else {
-        if (cursor->y > 0) cursor->y--;
+        if (cursor->y > 0)
+          cursor->y--;
       }
     } else if (token.type == TOKEN_OSC) {
       // Parse: ESC ] cmd ; text BEL/ST
@@ -754,7 +818,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       int cmd = 0;
       while (i < token.length && token.value[i] >= '0' && token.value[i] <= '9')
         cmd = cmd * 10 + (token.value[i++] - '0');
-      if (i < token.length && token.value[i] == ';') i++;
+      if (i < token.length && token.value[i] == ';')
+        i++;
       if (cmd == 0 || cmd == 1 || cmd == 2) {
         int text_start = i;
         // stop before BEL or ESC (ST)
@@ -762,7 +827,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         if (text_end > text_start && token.value[text_end] == '\\')
           text_end--; // strip the '\\' of ESC-backslash ST
         int tlen = text_end - text_start;
-        if (tlen < 0) tlen = 0;
+        if (tlen < 0)
+          tlen = 0;
         if (tlen >= (int)sizeof(terminal->window_title))
           tlen = sizeof(terminal->window_title) - 1;
         memcpy(terminal->window_title, &token.value[text_start], tlen);
@@ -777,8 +843,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   free(combined);
 }
 
-
-void resize_screen(Term_Screen *screen, int old_width, int old_height, int new_width, int new_height) {
+void resize_screen(Term_Screen *screen, int old_width, int old_height,
+                   int new_width, int new_height) {
   screen->scroll_offset = 0;
   screen->scroll_top = 0;
   screen->scroll_bot = new_height - 1;
@@ -828,8 +894,10 @@ void resize_terminal(Terminal *terminal, int new_width, int new_height) {
   int old_width = terminal->width;
   int old_height = terminal->height;
 
-  resize_screen(&terminal->screen, old_width, old_height, new_width, new_height);
-  resize_screen(&terminal->alt_screen, old_width, old_height, new_width, new_height);
+  resize_screen(&terminal->screen, old_width, old_height, new_width,
+                new_height);
+  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
+                new_height);
 
   terminal->width = new_width;
   terminal->height = new_height;

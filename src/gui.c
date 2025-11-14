@@ -1,22 +1,21 @@
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/Xft/Xft.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <fcntl.h>
+#include <pty.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/wait.h>
 #include <sys/ioctl.h>
-#include <fcntl.h>
-#include <pty.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
 
-#include "terminal.h"
 #include "args.h"
 #include "log.h"
-
+#include "terminal.h"
 
 typedef struct {
   Display *display;
@@ -107,47 +106,54 @@ void init_colors(GuiContext *gui, Args *args) {
     xrender_color.green = color.green;
     xrender_color.blue = color.blue;
     xrender_color.alpha = 0xffff;
-    XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_colors[i]);
+    XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
+                       &gui->xft_colors[i]);
   }
 
   xrender_color.red = 0xffff;
   xrender_color.green = 0xffff;
   xrender_color.blue = 0xffff;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_white);
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
+                     &gui->xft_white);
 
   xrender_color.red = 0;
   xrender_color.green = 0;
   xrender_color.blue = 0;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_black);
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
+                     &gui->xft_black);
 
   unsigned long fg_val = (args->fg != -1) ? (unsigned long)args->fg : 0xffffff;
   unsigned long bg_val = (args->bg != -1) ? (unsigned long)args->bg : 0x000000;
 
-  color.red   = ((fg_val >> 16) & 0xff) << 8;
-  color.green = ((fg_val >>  8) & 0xff) << 8;
-  color.blue  = ( fg_val        & 0xff) << 8;
+  color.red = ((fg_val >> 16) & 0xff) << 8;
+  color.green = ((fg_val >> 8) & 0xff) << 8;
+  color.blue = (fg_val & 0xff) << 8;
   color.flags = DoRed | DoGreen | DoBlue;
-  gui->default_fg = XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->white;
+  gui->default_fg =
+      XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->white;
 
-  color.red   = ((bg_val >> 16) & 0xff) << 8;
-  color.green = ((bg_val >>  8) & 0xff) << 8;
-  color.blue  = ( bg_val        & 0xff) << 8;
+  color.red = ((bg_val >> 16) & 0xff) << 8;
+  color.green = ((bg_val >> 8) & 0xff) << 8;
+  color.blue = (bg_val & 0xff) << 8;
   color.flags = DoRed | DoGreen | DoBlue;
-  gui->default_bg = XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->black;
+  gui->default_bg =
+      XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->black;
 
-  xrender_color.red   = ((fg_val >> 16) & 0xff) << 8;
-  xrender_color.green = ((fg_val >>  8) & 0xff) << 8;
-  xrender_color.blue  = ( fg_val        & 0xff) << 8;
+  xrender_color.red = ((fg_val >> 16) & 0xff) << 8;
+  xrender_color.green = ((fg_val >> 8) & 0xff) << 8;
+  xrender_color.blue = (fg_val & 0xff) << 8;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_default_fg);
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
+                     &gui->xft_default_fg);
 
-  xrender_color.red   = ((bg_val >> 16) & 0xff) << 8;
-  xrender_color.green = ((bg_val >>  8) & 0xff) << 8;
-  xrender_color.blue  = ( bg_val        & 0xff) << 8;
+  xrender_color.red = ((bg_val >> 16) & 0xff) << 8;
+  xrender_color.green = ((bg_val >> 8) & 0xff) << 8;
+  xrender_color.blue = (bg_val & 0xff) << 8;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color, &gui->xft_default_bg);
+  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
+                     &gui->xft_default_bg);
 }
 
 unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
@@ -186,7 +192,7 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
   return gui->white;
 }
 
-XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
+XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
   if (color.type == COLOR_DEFAULT && color.color >= 30 && color.color <= 37) {
     return &gui->xft_colors[color.color - 30];
   } else if (color.type == COLOR_BRIGHT && color.color >= 90 &&
@@ -224,7 +230,8 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
         xrender_color.green = g << 8;
         xrender_color.blue = b << 8;
         xrender_color.alpha = 0xffff;
-        XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
+        XftColorAllocValue(gui->display,
+                           DefaultVisual(gui->display, gui->screen),
                            DefaultColormap(gui->display, gui->screen),
                            &xrender_color, &gui->xft_color_cache[idx]);
         gui->xft_color_cached[idx] = true;
@@ -240,9 +247,9 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
     int slot = gui->rgb_cache_next;
     gui->rgb_cache_next = (gui->rgb_cache_next + 1) % 64;
     XRenderColor xrender_color;
-    xrender_color.red   = (unsigned short)(color.rgb.red   << 8);
+    xrender_color.red = (unsigned short)(color.rgb.red << 8);
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
-    xrender_color.blue  = (unsigned short)(color.rgb.blue  << 8);
+    xrender_color.blue = (unsigned short)(color.rgb.blue << 8);
     xrender_color.alpha = 0xffff;
     XftColorAllocValue(gui->display, DefaultVisual(gui->display, gui->screen),
                        DefaultColormap(gui->display, gui->screen),
@@ -255,18 +262,28 @@ XftColor* get_xft_color(GuiContext *gui, Term_Color color) {
 }
 
 static bool cell_in_selection(GuiContext *gui, int x, int y) {
-  if (!gui->has_selection) return false;
+  if (!gui->has_selection)
+    return false;
   int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
-  int bx = gui->sel_cur_x,    by = gui->sel_cur_y;
+  int bx = gui->sel_cur_x, by = gui->sel_cur_y;
   int start_x, start_y, end_x, end_y;
   if (ay < by || (ay == by && ax <= bx)) {
-    start_x = ax; start_y = ay; end_x = bx; end_y = by;
+    start_x = ax;
+    start_y = ay;
+    end_x = bx;
+    end_y = by;
   } else {
-    start_x = bx; start_y = by; end_x = ax; end_y = ay;
+    start_x = bx;
+    start_y = by;
+    end_x = ax;
+    end_y = ay;
   }
-  if (y < start_y || y > end_y) return false;
-  if (y == start_y && x < start_x) return false;
-  if (y == end_y && x > end_x) return false;
+  if (y < start_y || y > end_y)
+    return false;
+  if (y == start_y && x < start_x)
+    return false;
+  if (y == end_y && x > end_x)
+    return false;
   return true;
 }
 
@@ -274,28 +291,37 @@ static void build_selection_text(GuiContext *gui, Terminal *terminal) {
   free(gui->selection_text);
   gui->selection_text = NULL;
   gui->selection_len = 0;
-  if (!gui->has_selection) return;
+  if (!gui->has_selection)
+    return;
 
   int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
-  int bx = gui->sel_cur_x,    by = gui->sel_cur_y;
+  int bx = gui->sel_cur_x, by = gui->sel_cur_y;
   int start_x, start_y, end_x, end_y;
   if (ay < by || (ay == by && ax <= bx)) {
-    start_x = ax; start_y = ay; end_x = bx; end_y = by;
+    start_x = ax;
+    start_y = ay;
+    end_x = bx;
+    end_y = by;
   } else {
-    start_x = bx; start_y = by; end_x = ax; end_y = ay;
+    start_x = bx;
+    start_y = by;
+    end_x = ax;
+    end_y = ay;
   }
 
-  Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+  Term_Screen *scr =
+      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   Term_Scrollback *sb = &scr->scrollback;
 
   int max_len = (terminal->width * 6 + 1) * (end_y - start_y + 1) + 1;
   char *buf = malloc(max_len);
-  if (!buf) return;
+  if (!buf)
+    return;
   int pos = 0;
 
   for (int combined = start_y; combined <= end_y; combined++) {
     int x0 = (combined == start_y) ? start_x : 0;
-    int x1 = (combined == end_y)   ? end_x   : terminal->width - 1;
+    int x1 = (combined == end_y) ? end_x : terminal->width - 1;
 
     for (int x = x0; x <= x1; x++) {
       Term_Cell cell;
@@ -314,7 +340,8 @@ static void build_selection_text(GuiContext *gui, Terminal *terminal) {
         buf[pos++] = ' ';
       }
     }
-    if (combined < end_y) buf[pos++] = '\n';
+    if (combined < end_y)
+      buf[pos++] = '\n';
   }
 
   buf[pos] = '\0';
@@ -354,7 +381,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
-      bool is_cursor = gui->cursor_visible && !term_screen->cursor_hidden &&
+      bool is_cursor =
+          gui->cursor_visible && !term_screen->cursor_hidden &&
           (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       bool in_selection = cell_in_selection(gui, x, combined);
@@ -363,13 +391,15 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       unsigned long text_color;
       if (reverse) {
         text_color = bg_color;
-        bg_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
-                       ? get_color_pixel(gui, cell.attr.fg)
-                       : gui->default_fg;
+        bg_color =
+            (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
+                ? get_color_pixel(gui, cell.attr.fg)
+                : gui->default_fg;
       } else {
-        text_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
-                         ? get_color_pixel(gui, cell.attr.fg)
-                         : gui->default_fg;
+        text_color =
+            (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
+                ? get_color_pixel(gui, cell.attr.fg)
+                : gui->default_fg;
       }
 
       XSetForeground(gui->display, gui->gc, bg_color);
@@ -381,13 +411,20 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
 
         if (reverse) {
-          fg_color = (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) ? get_xft_color(gui, cell.attr.bg) : &gui->xft_default_bg;
+          fg_color =
+              (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0)
+                  ? get_xft_color(gui, cell.attr.bg)
+                  : &gui->xft_default_bg;
         } else {
-          fg_color = (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0) ? get_xft_color(gui, cell.attr.fg) : &gui->xft_default_fg;
+          fg_color =
+              (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
+                  ? get_xft_color(gui, cell.attr.fg)
+                  : &gui->xft_default_fg;
         }
 
         XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
-                          pixel_y + gui->char_ascent, (FcChar8*)cell.data, cell.length);
+                          pixel_y + gui->char_ascent, (FcChar8 *)cell.data,
+                          cell.length);
 
         if (cell.attr.underline) {
           XSetForeground(gui->display, gui->gc, text_color);
@@ -411,10 +448,10 @@ void init_shell(GuiContext *gui, int cols, int rows) {
   LOG_INFO_MSG("Initializing shell subprocess");
 
   struct winsize ws = {
-    .ws_row = rows,
-    .ws_col = cols,
-    .ws_xpixel = 0,
-    .ws_ypixel = 0,
+      .ws_row = rows,
+      .ws_col = cols,
+      .ws_xpixel = 0,
+      .ws_ypixel = 0,
   };
 
   if (openpty(&master, &slave, NULL, NULL, &ws) == -1) {
@@ -489,14 +526,14 @@ int init_gui(GuiContext *gui, Args *args) {
 
   gui->window_width = 800;
   gui->window_height = 600;
-  gui->window =
-      XCreateSimpleWindow(gui->display, RootWindow(gui->display, gui->screen),
-                          100, 100, gui->window_width, gui->window_height, 1, gui->white, gui->black);
+  gui->window = XCreateSimpleWindow(
+      gui->display, RootWindow(gui->display, gui->screen), 100, 100,
+      gui->window_width, gui->window_height, 1, gui->white, gui->black);
 
   XSelectInput(gui->display, gui->window,
-               ExposureMask | KeyPressMask | ButtonPressMask | ButtonReleaseMask |
-               Button1MotionMask | Button2MotionMask | Button3MotionMask |
-               PointerMotionMask | StructureNotifyMask);
+               ExposureMask | KeyPressMask | ButtonPressMask |
+                   ButtonReleaseMask | Button1MotionMask | Button2MotionMask |
+                   Button3MotionMask | PointerMotionMask | StructureNotifyMask);
 
   XStoreName(gui->display, gui->window, "Terminal GUI");
 
@@ -525,7 +562,8 @@ int init_gui(GuiContext *gui, Args *args) {
     if (strstr(args->font, "size="))
       snprintf(font_pattern, sizeof(font_pattern), "%s", args->font);
     else
-      snprintf(font_pattern, sizeof(font_pattern), "%s:size=%d", args->font, font_size);
+      snprintf(font_pattern, sizeof(font_pattern), "%s:size=%d", args->font,
+               font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       fprintf(stderr, "Cannot load font '%s'\n", args->font);
@@ -535,7 +573,8 @@ int init_gui(GuiContext *gui, Args *args) {
     }
     gui->font_bold = gui->font;
   } else {
-    snprintf(font_pattern, sizeof(font_pattern), "Iosevka Nerd Font Mono:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern),
+             "Iosevka Nerd Font Mono:size=%d", font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       LOG_WARNING_MSG("Cannot load Iosevka font, trying FreeMono");
@@ -549,16 +588,20 @@ int init_gui(GuiContext *gui, Args *args) {
         snprintf(repo_dir, sizeof(repo_dir), "%s", exe_dir);
       }
       char bundled_font[1024];
-      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf", repo_dir);
+      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf",
+               repo_dir);
       FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf", repo_dir);
+      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf",
+               repo_dir);
       FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-      snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d", font_size);
+      snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d",
+               font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     }
     if (!gui->font) {
       LOG_WARNING_MSG("Cannot load FreeMono font, trying monospace fallback");
-      snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d", font_size);
+      snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d",
+               font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     }
     if (!gui->font) {
@@ -568,10 +611,12 @@ int init_gui(GuiContext *gui, Args *args) {
       return 1;
     }
 
-    snprintf(font_pattern, sizeof(font_pattern), "Iosevka Nerd Font Mono:weight=bold:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern),
+             "Iosevka Nerd Font Mono:weight=bold:size=%d", font_size);
     gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font_bold) {
-      snprintf(font_pattern, sizeof(font_pattern), "monospace:weight=bold:size=%d", font_size);
+      snprintf(font_pattern, sizeof(font_pattern),
+               "monospace:weight=bold:size=%d", font_size);
       gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
     }
     if (!gui->font_bold)
@@ -613,16 +658,19 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
   }
 }
 
-static void send_mouse_event(GuiContext *gui, Terminal *terminal,
-                             int btn, int x, int y, bool release) {
+static void send_mouse_event(GuiContext *gui, Terminal *terminal, int btn,
+                             int x, int y, bool release) {
   char buf[32];
   int len;
   if (terminal->mouse_sgr) {
-    len = snprintf(buf, sizeof(buf), "\x1b[<%d;%d;%d%c",
-                   btn, x + 1, y + 1, release ? 'm' : 'M');
+    len = snprintf(buf, sizeof(buf), "\x1b[<%d;%d;%d%c", btn, x + 1, y + 1,
+                   release ? 'm' : 'M');
   } else {
-    if (x + 1 > 223 || y + 1 > 223) return;
-    buf[0] = '\x1b'; buf[1] = '['; buf[2] = 'M';
+    if (x + 1 > 223 || y + 1 > 223)
+      return;
+    buf[0] = '\x1b';
+    buf[1] = '[';
+    buf[2] = 'M';
     buf[3] = (char)((release ? 3 : btn) + 32);
     buf[4] = (char)(x + 1 + 32);
     buf[5] = (char)(y + 1 + 32);
@@ -646,8 +694,8 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       gui->window_height = new_height;
 
       XFreePixmap(gui->display, gui->backbuffer);
-      gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
-                                      gui->window_height,
+      gui->backbuffer = XCreatePixmap(gui->display, gui->window,
+                                      gui->window_width, gui->window_height,
                                       DefaultDepth(gui->display, gui->screen));
 
       XftDrawDestroy(gui->xft_draw);
@@ -658,17 +706,19 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       int term_cols = (new_width - 20) / gui->char_width;
       int term_rows = (new_height - 20) / (gui->char_height);
 
-      if (term_cols < 1) term_cols = 1;
-      if (term_rows < 1) term_rows = 1;
+      if (term_cols < 1)
+        term_cols = 1;
+      if (term_rows < 1)
+        term_rows = 1;
 
       LOG_DEBUG_MSG("Terminal resized to %dx%d", term_cols, term_rows);
       resize_terminal(terminal, term_cols, term_rows);
 
       struct winsize ws = {
-        .ws_row = term_rows,
-        .ws_col = term_cols,
-        .ws_xpixel = 0,
-        .ws_ypixel = 0,
+          .ws_row = term_rows,
+          .ws_col = term_cols,
+          .ws_xpixel = 0,
+          .ws_ypixel = 0,
       };
       ioctl(gui->pipe_fd, TIOCSWINSZ, &ws);
       kill(gui->child_pid, SIGWINCH);
@@ -684,24 +734,30 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     KeySym keysym;
     XLookupString(&event->xkey, buffer, sizeof(buffer), &keysym, NULL);
 
-    Term_Screen *scr = terminal->using_alt_screen
-                           ? &terminal->alt_screen : &terminal->screen;
+    Term_Screen *scr =
+        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     int max_scroll = scr->scrollback.count;
 
     if (keysym == XK_Prior && (event->xkey.state & ShiftMask)) {
       scr->scroll_offset += terminal->height;
-      if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
+      if (scr->scroll_offset > max_scroll)
+        scr->scroll_offset = max_scroll;
       draw_terminal(gui, terminal);
     } else if (keysym == XK_Next && (event->xkey.state & ShiftMask)) {
       scr->scroll_offset -= terminal->height;
-      if (scr->scroll_offset < 0) scr->scroll_offset = 0;
+      if (scr->scroll_offset < 0)
+        scr->scroll_offset = 0;
       draw_terminal(gui, terminal);
-    } else if (keysym == XK_c && (event->xkey.state & ControlMask) && (event->xkey.state & ShiftMask)) {
+    } else if (keysym == XK_c && (event->xkey.state & ControlMask) &&
+               (event->xkey.state & ShiftMask)) {
       if (gui->has_selection)
-        XSetSelectionOwner(gui->display, gui->atom_clipboard, gui->window, CurrentTime);
-    } else if (keysym == XK_v && (event->xkey.state & ControlMask) && (event->xkey.state & ShiftMask)) {
-      XConvertSelection(gui->display, gui->atom_clipboard, gui->atom_utf8_string,
-                        gui->atom_xsel_data, gui->window, CurrentTime);
+        XSetSelectionOwner(gui->display, gui->atom_clipboard, gui->window,
+                           CurrentTime);
+    } else if (keysym == XK_v && (event->xkey.state & ControlMask) &&
+               (event->xkey.state & ShiftMask)) {
+      XConvertSelection(gui->display, gui->atom_clipboard,
+                        gui->atom_utf8_string, gui->atom_xsel_data, gui->window,
+                        CurrentTime);
     } else if (keysym == XK_BackSpace) {
       write(gui->pipe_fd, "\x7f", 1);
     } else if (keysym == XK_Return || keysym == XK_KP_Enter) {
@@ -711,16 +767,20 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     } else if (keysym == XK_Escape) {
       write(gui->pipe_fd, "\x1b", 1);
     } else if (keysym == XK_Up) {
-      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
+      write(gui->pipe_fd,
+            (event->xkey.state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
             (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Down) {
-      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5B" : "\x1b[B",
+      write(gui->pipe_fd,
+            (event->xkey.state & ControlMask) ? "\x1b[1;5B" : "\x1b[B",
             (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Right) {
-      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5C" : "\x1b[C",
+      write(gui->pipe_fd,
+            (event->xkey.state & ControlMask) ? "\x1b[1;5C" : "\x1b[C",
             (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Left) {
-      write(gui->pipe_fd, (event->xkey.state & ControlMask) ? "\x1b[1;5D" : "\x1b[D",
+      write(gui->pipe_fd,
+            (event->xkey.state & ControlMask) ? "\x1b[1;5D" : "\x1b[D",
             (event->xkey.state & ControlMask) ? 6 : 3);
     } else if (keysym == XK_Home) {
       write(gui->pipe_fd, "\x1b[H", 3);
@@ -736,9 +796,9 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       write(gui->pipe_fd, "\x1b[6~", 4);
     } else if (keysym >= XK_F1 && keysym <= XK_F12) {
       const char *fkeys[] = {
-        "\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",
-        "\x1b[15~", "\x1b[17~", "\x1b[18~", "\x1b[19~",
-        "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~",
+          "\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",
+          "\x1b[15~", "\x1b[17~", "\x1b[18~", "\x1b[19~",
+          "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~",
       };
       const char *seq = fkeys[keysym - XK_F1];
       write(gui->pipe_fd, seq, strlen(seq));
@@ -758,29 +818,45 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     break;
   }
   case ButtonPress: {
-    Term_Screen *scr = terminal->using_alt_screen
-                           ? &terminal->alt_screen : &terminal->screen;
+    Term_Screen *scr =
+        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     int max_scroll = scr->scrollback.count;
     int cell_x = (event->xbutton.x - 10) / gui->char_width;
     int cell_y = (event->xbutton.y - 10) / gui->char_height;
-    if (cell_x < 0) cell_x = 0;
-    if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-    if (cell_y < 0) cell_y = 0;
-    if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+    if (cell_x < 0)
+      cell_x = 0;
+    if (cell_x >= terminal->width)
+      cell_x = terminal->width - 1;
+    if (cell_y < 0)
+      cell_y = 0;
+    if (cell_y >= terminal->height)
+      cell_y = terminal->height - 1;
     bool shift = (event->xbutton.state & ShiftMask) != 0;
 
     if (terminal->mouse_mode >= 1 && !shift) {
       int btn = -1;
       switch (event->xbutton.button) {
-        case Button1: btn = 0; break;
-        case Button2: btn = 1; break;
-        case Button3: btn = 2; break;
-        case Button4: btn = 64; break;
-        case Button5: btn = 65; break;
+      case Button1:
+        btn = 0;
+        break;
+      case Button2:
+        btn = 1;
+        break;
+      case Button3:
+        btn = 2;
+        break;
+      case Button4:
+        btn = 64;
+        break;
+      case Button5:
+        btn = 65;
+        break;
       }
       if (btn >= 0) {
-        if (event->xbutton.state & Mod1Mask)    btn |= 8;
-        if (event->xbutton.state & ControlMask) btn |= 16;
+        if (event->xbutton.state & Mod1Mask)
+          btn |= 8;
+        if (event->xbutton.state & ControlMask)
+          btn |= 16;
         send_mouse_event(gui, terminal, btn, cell_x, cell_y, false);
         break;
       }
@@ -800,11 +876,13 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
                         gui->atom_xsel_data, gui->window, CurrentTime);
     } else if (event->xbutton.button == Button4) {
       scr->scroll_offset += 3;
-      if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
+      if (scr->scroll_offset > max_scroll)
+        scr->scroll_offset = max_scroll;
       draw_terminal(gui, terminal);
     } else if (event->xbutton.button == Button5) {
       scr->scroll_offset -= 3;
-      if (scr->scroll_offset < 0) scr->scroll_offset = 0;
+      if (scr->scroll_offset < 0)
+        scr->scroll_offset = 0;
       draw_terminal(gui, terminal);
     }
     break;
@@ -816,34 +894,46 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       if (terminal->mouse_mode >= 1 && !shift) {
         int cell_x = (event->xbutton.x - 10) / gui->char_width;
         int cell_y = (event->xbutton.y - 10) / gui->char_height;
-        if (cell_x < 0) cell_x = 0;
-        if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-        if (cell_y < 0) cell_y = 0;
-        if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+        if (cell_x < 0)
+          cell_x = 0;
+        if (cell_x >= terminal->width)
+          cell_x = terminal->width - 1;
+        if (cell_y < 0)
+          cell_y = 0;
+        if (cell_y >= terminal->height)
+          cell_y = terminal->height - 1;
         int btn = 0;
-        if (event->xbutton.state & Mod1Mask)    btn |= 8;
-        if (event->xbutton.state & ControlMask) btn |= 16;
+        if (event->xbutton.state & Mod1Mask)
+          btn |= 8;
+        if (event->xbutton.state & ControlMask)
+          btn |= 16;
         send_mouse_event(gui, terminal, btn, cell_x, cell_y, true);
         break;
       }
 
       if (gui->selecting) {
-        Term_Screen *scr = terminal->using_alt_screen
-                               ? &terminal->alt_screen : &terminal->screen;
+        Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen
+                                                      : &terminal->screen;
         int cell_x = (event->xbutton.x - 10) / gui->char_width;
         int cell_y = (event->xbutton.y - 10) / gui->char_height;
-        if (cell_x < 0) cell_x = 0;
-        if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-        if (cell_y < 0) cell_y = 0;
-        if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+        if (cell_x < 0)
+          cell_x = 0;
+        if (cell_x >= terminal->width)
+          cell_x = terminal->width - 1;
+        if (cell_y < 0)
+          cell_y = 0;
+        if (cell_y >= terminal->height)
+          cell_y = terminal->height - 1;
         int cur_row = scr->scrollback.count - scr->scroll_offset + cell_y;
         gui->sel_cur_x = cell_x;
         gui->sel_cur_y = cur_row;
         gui->selecting = false;
-        gui->has_selection = (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cur_row);
+        gui->has_selection =
+            (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cur_row);
         if (gui->has_selection) {
           build_selection_text(gui, terminal);
-          XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+          XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window,
+                             CurrentTime);
         }
         draw_terminal(gui, terminal);
       }
@@ -853,10 +943,14 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
   case MotionNotify: {
     int cell_x = (event->xmotion.x - 10) / gui->char_width;
     int cell_y = (event->xmotion.y - 10) / gui->char_height;
-    if (cell_x < 0) cell_x = 0;
-    if (cell_x >= terminal->width) cell_x = terminal->width - 1;
-    if (cell_y < 0) cell_y = 0;
-    if (cell_y >= terminal->height) cell_y = terminal->height - 1;
+    if (cell_x < 0)
+      cell_x = 0;
+    if (cell_x >= terminal->width)
+      cell_x = terminal->width - 1;
+    if (cell_y < 0)
+      cell_y = 0;
+    if (cell_y >= terminal->height)
+      cell_y = terminal->height - 1;
     bool shift = (event->xmotion.state & ShiftMask) != 0;
 
     if (terminal->mouse_mode >= 1 && !shift) {
@@ -864,23 +958,28 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
       bool btn2 = (event->xmotion.state & Button2Mask) != 0;
       bool btn3 = (event->xmotion.state & Button3Mask) != 0;
       bool any_btn = btn1 || btn2 || btn3;
-      bool should_report = (terminal->mouse_mode >= 3) ||
-                            (terminal->mouse_mode >= 2 && any_btn);
+      bool should_report =
+          (terminal->mouse_mode >= 3) || (terminal->mouse_mode >= 2 && any_btn);
       if (should_report) {
         int btn = 32;
-        if (btn1)      btn = 32 + 0;
-        else if (btn2) btn = 32 + 1;
-        else if (btn3) btn = 32 + 2;
-        if (event->xmotion.state & Mod1Mask)    btn |= 8;
-        if (event->xmotion.state & ControlMask) btn |= 16;
+        if (btn1)
+          btn = 32 + 0;
+        else if (btn2)
+          btn = 32 + 1;
+        else if (btn3)
+          btn = 32 + 2;
+        if (event->xmotion.state & Mod1Mask)
+          btn |= 8;
+        if (event->xmotion.state & ControlMask)
+          btn |= 16;
         send_mouse_event(gui, terminal, btn, cell_x, cell_y, false);
         break;
       }
     }
 
     if (gui->selecting) {
-      Term_Screen *scr = terminal->using_alt_screen
-                             ? &terminal->alt_screen : &terminal->screen;
+      Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen
+                                                    : &terminal->screen;
       gui->sel_cur_x = cell_x;
       gui->sel_cur_y = scr->scrollback.count - scr->scroll_offset + cell_y;
       gui->has_selection = true;
@@ -902,23 +1001,24 @@ void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event) {
     reply.time = req->time;
     if (gui->has_selection && gui->selection_text &&
         (req->target == gui->atom_utf8_string || req->target == XA_STRING)) {
-      XChangeProperty(req->display, req->requestor, req->property,
-                      req->target, 8, PropModeReplace,
-                      (unsigned char *)gui->selection_text, gui->selection_len);
+      XChangeProperty(req->display, req->requestor, req->property, req->target,
+                      8, PropModeReplace, (unsigned char *)gui->selection_text,
+                      gui->selection_len);
       reply.property = req->property;
     }
     XSendEvent(req->display, req->requestor, False, 0, (XEvent *)&reply);
     break;
   }
   case SelectionNotify: {
-    if (event->xselection.property == None) break;
+    if (event->xselection.property == None)
+      break;
     Atom actual_type;
     int actual_format;
     unsigned long nitems, bytes_after;
     unsigned char *data = NULL;
-    XGetWindowProperty(gui->display, gui->window, gui->atom_xsel_data,
-                       0, 65536, True, AnyPropertyType,
-                       &actual_type, &actual_format, &nitems, &bytes_after, &data);
+    XGetWindowProperty(gui->display, gui->window, gui->atom_xsel_data, 0, 65536,
+                       True, AnyPropertyType, &actual_type, &actual_format,
+                       &nitems, &bytes_after, &data);
     if (data) {
       if (terminal->bracketed_paste)
         write(gui->pipe_fd, "\x1b[200~", 6);
@@ -1003,8 +1103,10 @@ int main(int argc, char *argv[]) {
 
   int term_cols = (gui.window_width - 20) / gui.char_width;
   int term_rows = (gui.window_height - 20) / (gui.char_height);
-  if (term_cols < 1) term_cols = 1;
-  if (term_rows < 1) term_rows = 1;
+  if (term_cols < 1)
+    term_cols = 1;
+  if (term_rows < 1)
+    term_rows = 1;
   init_terminal(&terminal, term_cols, term_rows);
   init_shell(&gui, term_cols, term_rows);
 

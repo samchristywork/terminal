@@ -3,12 +3,7 @@
 
 #include <stdio.h>
 
-typedef enum {
-  LOG_DEBUG,
-  LOG_INFO,
-  LOG_WARNING,
-  LOG_ERROR
-} LogLevel;
+typedef enum { LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERROR } LogLevel;
 
 void log_init(FILE *output);
 void log_set_file(const char *filename);

@@ -80,33 +80,33 @@ typedef struct {
   char partial_buf[64];
   int partial_len;
   bool bracketed_paste;
-  int mouse_mode;  // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
-  bool mouse_sgr;  // SGR extended coordinates (1006)
+  int mouse_mode; // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
+  bool mouse_sgr; // SGR extended coordinates (1006)
 } Terminal;
 
 typedef enum {
   TOKEN_TEXT,
-  TOKEN_NEWLINE,          // \n
-  TOKEN_CARRIAGE_RETURN,  // \r
-  TOKEN_CSI_CODE,         // ESC[...m ESC[..H
-  TOKEN_ERASE_EOL,        // ESC[K ESC[0K
-  TOKEN_ERASE_SOL,        // ESC[1K
-  TOKEN_ERASE_LINE,       // ESC[2K
-  TOKEN_ERASE_DOWN,       // ESC[J ESC[0J
-  TOKEN_ERASE_UP,         // ESC[1J
-  TOKEN_ERASE_ALL,        // ESC[2J
-  TOKEN_ERASE_SCROLLBACK, // ESC[3J
-  TOKEN_ALT_SCREEN,       // ESC[?1049h
-  TOKEN_MAIN_SCREEN,      // ESC[?1049l
-  TOKEN_CURSOR_HIDE,      // ESC[?25l
-  TOKEN_CURSOR_SHOW,      // ESC[?25h
+  TOKEN_NEWLINE,             // \n
+  TOKEN_CARRIAGE_RETURN,     // \r
+  TOKEN_CSI_CODE,            // ESC[...m ESC[..H
+  TOKEN_ERASE_EOL,           // ESC[K ESC[0K
+  TOKEN_ERASE_SOL,           // ESC[1K
+  TOKEN_ERASE_LINE,          // ESC[2K
+  TOKEN_ERASE_DOWN,          // ESC[J ESC[0J
+  TOKEN_ERASE_UP,            // ESC[1J
+  TOKEN_ERASE_ALL,           // ESC[2J
+  TOKEN_ERASE_SCROLLBACK,    // ESC[3J
+  TOKEN_ALT_SCREEN,          // ESC[?1049h
+  TOKEN_MAIN_SCREEN,         // ESC[?1049l
+  TOKEN_CURSOR_HIDE,         // ESC[?25l
+  TOKEN_CURSOR_SHOW,         // ESC[?25h
   TOKEN_BRACKETED_PASTE_ON,  // ESC[?2004h
   TOKEN_BRACKETED_PASTE_OFF, // ESC[?2004l
   TOKEN_FULL_RESET,          // ESC c (RIS)
-  TOKEN_TAB,              // \t
-  TOKEN_BACKSPACE,        // \b or 0x7f
-  TOKEN_OSC,              // ESC ] ... BEL/ST
-  TOKEN_REVERSE_INDEX,    // ESC M
+  TOKEN_TAB,                 // \t
+  TOKEN_BACKSPACE,           // \b or 0x7f
+  TOKEN_OSC,                 // ESC ] ... BEL/ST
+  TOKEN_REVERSE_INDEX,       // ESC M
   TOKEN_UNKNOWN,
 } Term_TokenType;
 

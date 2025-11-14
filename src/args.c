@@ -8,11 +8,17 @@ void print_usage(const char *program_name) {
   fprintf(stderr, "Usage: %s [OPTIONS]\n", program_name);
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "  --font-size SIZE      Set font size (default: 14)\n");
-  fprintf(stderr, "  --font PATTERN        Fontconfig font pattern (e.g. 'Monospace')\n");
-  fprintf(stderr, "  --fg RRGGBB           Default foreground color (hex, default: ffffff)\n");
-  fprintf(stderr, "  --bg RRGGBB           Default background color (hex, default: 000000)\n");
-  fprintf(stderr, "  --color N RRGGBB      Override palette color N (0-15) with hex value\n");
-  fprintf(stderr, "  --log-file FILE       Write logs to FILE instead of stdout\n");
+  fprintf(
+      stderr,
+      "  --font PATTERN        Fontconfig font pattern (e.g. 'Monospace')\n");
+  fprintf(stderr, "  --fg RRGGBB           Default foreground color (hex, "
+                  "default: ffffff)\n");
+  fprintf(stderr, "  --bg RRGGBB           Default background color (hex, "
+                  "default: 000000)\n");
+  fprintf(stderr, "  --color N RRGGBB      Override palette color N (0-15) "
+                  "with hex value\n");
+  fprintf(stderr,
+          "  --log-file FILE       Write logs to FILE instead of stdout\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
 
@@ -22,7 +28,8 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->font = NULL;
   args->fg = -1;
   args->bg = -1;
-  for (int i = 0; i < 16; i++) args->palette[i] = -1;
+  for (int i = 0; i < 16; i++)
+    args->palette[i] = -1;
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--font-size") == 0) {

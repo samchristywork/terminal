@@ -39,13 +39,18 @@ void log_close(void) {
   }
 }
 
-const char* log_level_string(LogLevel level) {
+const char *log_level_string(LogLevel level) {
   switch (level) {
-    case LOG_DEBUG:   return "DEBUG";
-    case LOG_INFO:    return "INFO";
-    case LOG_WARNING: return "WARNING";
-    case LOG_ERROR:   return "ERROR";
-    default:          return "UNKNOWN";
+  case LOG_DEBUG:
+    return "DEBUG";
+  case LOG_INFO:
+    return "INFO";
+  case LOG_WARNING:
+    return "WARNING";
+  case LOG_ERROR:
+    return "ERROR";
+  default:
+    return "UNKNOWN";
   }
 }
 
