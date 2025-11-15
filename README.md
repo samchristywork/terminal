@@ -35,6 +35,18 @@ artifact-free even during rapid screen updates.
 
 ## Usage
 
+```
+Usage: ./build/gui [OPTIONS]
+Options:
+  --font-size SIZE      Set font size (default: 14)
+  --font PATTERN        Fontconfig font pattern (e.g. 'Monospace')
+  --fg RRGGBB           Default foreground color (hex, default: ffffff)
+  --bg RRGGBB           Default background color (hex, default: 000000)
+  --color N RRGGBB      Override palette color N (0-15) with hex value
+  --log-file FILE       Write logs to FILE instead of stdout
+  --help                Show this help message
+```
+
 ## Dependencies
 
 ## License
