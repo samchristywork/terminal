@@ -20,6 +20,19 @@ artifact-free even during rapid screen updates.
 
 ## Features
 
+- VT100/VT220 and ANSI escape code support
+- 16-color, 256-color, and true-color (RGB) rendering via Xft
+- Scrollback buffer (1000 lines)
+- Alternate screen buffer support
+- Mouse reporting (click, button+motion, and any-motion modes with SGR extension)
+- Text selection and clipboard integration (PRIMARY and CLIPBOARD)
+- Blinking cursor
+- Bracketed paste mode
+- Bold text with a separate bold font
+- Configurable font, font size, foreground/background colors, and palette
+- Double-buffered rendering to eliminate flicker
+- Bundled FreeMono font
+
 ## Usage
 
 ## Dependencies
