@@ -1160,6 +1160,27 @@ int main(int argc, char *argv[]) {
         XStoreName(gui.display, gui.window, terminal.window_title);
         terminal.title_dirty = false;
       }
+      if (terminal.bg_dirty) {
+        unsigned long bg_val = terminal.osc_bg;
+        Colormap colormap = DefaultColormap(gui.display, gui.screen);
+        Visual *visual = DefaultVisual(gui.display, gui.screen);
+        XColor color;
+        color.red = ((bg_val >> 16) & 0xff) << 8;
+        color.green = ((bg_val >> 8) & 0xff) << 8;
+        color.blue = (bg_val & 0xff) << 8;
+        color.flags = DoRed | DoGreen | DoBlue;
+        gui.default_bg =
+            XAllocColor(gui.display, colormap, &color) ? color.pixel : gui.black;
+        XftColorFree(gui.display, visual, colormap, &gui.xft_default_bg);
+        XRenderColor xrender_color;
+        xrender_color.red = color.red;
+        xrender_color.green = color.green;
+        xrender_color.blue = color.blue;
+        xrender_color.alpha = 0xffff;
+        XftColorAllocValue(gui.display, visual, colormap, &xrender_color,
+                           &gui.xft_default_bg);
+        terminal.bg_dirty = false;
+      }
       draw_terminal(&gui, &terminal);
       XFlush(gui.display);
     }

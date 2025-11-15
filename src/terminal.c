@@ -52,6 +52,8 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->bracketed_paste = false;
   terminal->mouse_mode = 0;
   terminal->mouse_sgr = false;
+  terminal->osc_bg = 0;
+  terminal->bg_dirty = false;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
 }
@@ -834,6 +836,21 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         memcpy(terminal->window_title, &token.value[text_start], tlen);
         terminal->window_title[tlen] = '\0';
         terminal->title_dirty = true;
+      } else if (cmd == 11) {
+        // OSC 11 ; #RRGGBB — set default background color
+        const char *val = &token.value[i];
+        int remaining = token.length - i;
+        if (remaining >= 7 && val[0] == '#') {
+          char hex[7];
+          memcpy(hex, val + 1, 6);
+          hex[6] = '\0';
+          char *end;
+          unsigned long rgb = strtoul(hex, &end, 16);
+          if (end == hex + 6) {
+            terminal->osc_bg = rgb;
+            terminal->bg_dirty = true;
+          }
+        }
       }
     }
   }

@@ -82,6 +82,8 @@ typedef struct {
   bool bracketed_paste;
   int mouse_mode; // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
   bool mouse_sgr; // SGR extended coordinates (1006)
+  unsigned long osc_bg; // packed 0xRRGGBB set by OSC 11
+  bool bg_dirty;
 } Terminal;
 
 typedef enum {
