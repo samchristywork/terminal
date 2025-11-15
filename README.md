@@ -49,6 +49,15 @@ Options:
 
 ## Dependencies
 
+```
+gcc
+libx11-dev
+libxft-dev
+libxrender-dev
+libfontconfig-dev
+make
+```
+
 ## License
 
 This work is licensed under the GNU General Public License version 3 (GPLv3).
