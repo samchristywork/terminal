@@ -2,6 +2,16 @@
 
 ## Overview
 
+This is a lightweight terminal emulator written in C using the X11 and Xft
+libraries for rendering. It implements a substantial subset of the VT100/VT220
+and ANSI escape code standards, supporting features such as alternate screen
+buffers, mouse reporting, bracketed paste, and a scrollback buffer.
+
+The emulator forks a child shell process and communicates with it through a
+pseudoterminal (PTY), relaying input and output between the shell and the
+graphical window. Double buffering via an X11 Pixmap keeps rendering
+artifact-free even during rapid screen updates.
+
 ## Screenshots
 
 <p align="center">
