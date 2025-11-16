@@ -1087,8 +1087,8 @@ int main(int argc, char *argv[]) {
     log_set_file(args.log_file);
     LOG_INFO_MSG("Logging to file: %s", args.log_file);
   } else {
-    log_init(stdout);
-    LOG_INFO_MSG("Logging to stdout");
+    log_init(stderr);
+    LOG_INFO_MSG("Logging to stderr");
   }
 
   GuiContext gui;

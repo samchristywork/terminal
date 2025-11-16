@@ -24,7 +24,7 @@ void log_set_file(const char *filename) {
   log_output = fopen(filename, "a");
   if (log_output == NULL) {
     fprintf(stderr, "Error: Could not open log file '%s'\n", filename);
-    log_output = stdout;
+    log_output = stderr;
     log_owns_file = 0;
   } else {
     log_owns_file = 1;
@@ -56,7 +56,7 @@ const char *log_level_string(LogLevel level) {
 
 void log_message(LogLevel level, const char *format, ...) {
   if (log_output == NULL) {
-    log_output = stdout;
+    log_output = stderr;
   }
 
   time_t now;
