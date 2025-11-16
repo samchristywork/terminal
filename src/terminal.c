@@ -760,6 +760,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
                   move * sizeof(Term_Cell));
         for (int k = width - cols; k < width; k++)
           memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+      } else if (final == 'X') {
+        int cols = (n < width - cursor->x) ? n : width - cursor->x;
+        for (int k = cursor->x; k < cursor->x + cols; k++)
+          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
       } else if (final == 'h' || final == 'l') {
         bool enable = (final == 'h');
         if (starts_with(token.value, token.length, "\x1b[?1000"))
