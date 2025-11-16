@@ -6,6 +6,14 @@
 #include "log.h"
 #include "terminal.h"
 
+static void terminal_respond(Terminal *t, const char *data, int len) {
+  int available = (int)sizeof(t->response_buf) - t->response_len;
+  if (len > available)
+    len = available;
+  memcpy(t->response_buf + t->response_len, data, len);
+  t->response_len += len;
+}
+
 static void token_repr(const Term_Token *t, char *buf, int bufsize) {
   int out = 0;
   for (int i = 0; i < t->length && out < bufsize - 4; i++) {
@@ -70,6 +78,9 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->mouse_sgr = false;
   terminal->osc_bg = 0;
   terminal->bg_dirty = false;
+  terminal->default_fg_rgb = 0xffffff;
+  terminal->response_len = 0;
+  terminal->title_stack_depth = 0;
   init_screen(&terminal->screen, width, height);
   init_screen(&terminal->alt_screen, width, height);
 }
@@ -101,6 +112,8 @@ void reset_terminal(Terminal *terminal) {
   terminal->bracketed_paste = false;
   terminal->mouse_mode = 0;
   terminal->mouse_sgr = false;
+  terminal->response_len = 0;
+  terminal->title_stack_depth = 0;
 }
 
 void scroll_screen(Term_Screen *screen, int width, int height) {
@@ -756,6 +769,49 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           terminal->mouse_mode = enable ? 3 : 0;
         else if (starts_with(token.value, token.length, "\x1b[?1006"))
           terminal->mouse_sgr = enable;
+      } else if (final == 't') {
+        const char *p = token.value + 2;
+        const char *end = token.value + token.length - 1;
+        int n1 = 0, n2 = 0;
+        while (p < end && *p >= '0' && *p <= '9')
+          n1 = n1 * 10 + (*p++ - '0');
+        if (p < end && *p == ';') {
+          p++;
+          while (p < end && *p >= '0' && *p <= '9')
+            n2 = n2 * 10 + (*p++ - '0');
+        }
+        (void)n2;
+        if (n1 == 22) {
+          if (terminal->title_stack_depth < 8) {
+            memcpy(terminal->title_stack[terminal->title_stack_depth],
+                   terminal->window_title, 256);
+            terminal->title_stack_depth++;
+          }
+        } else if (n1 == 23) {
+          if (terminal->title_stack_depth > 0) {
+            terminal->title_stack_depth--;
+            memcpy(terminal->window_title,
+                   terminal->title_stack[terminal->title_stack_depth], 256);
+            terminal->title_dirty = true;
+          }
+        }
+      } else if (final == 'n') {
+        if (n == 6) {
+          char buf[32];
+          int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dR",
+                             cursor->y + 1, cursor->x + 1);
+          terminal_respond(terminal, buf, len);
+        }
+      } else if (final == 'c') {
+        char buf[32];
+        int len;
+        if (starts_with(token.value, token.length, "\x1b[>"))
+          len = snprintf(buf, sizeof(buf), "\x1b[>0;0;0c");
+        else
+          len = snprintf(buf, sizeof(buf), "\x1b[?1;0c");
+        terminal_respond(terminal, buf, len);
+      } else if (final == 'q') {
+        // DECSCUSR cursor shape — accept silently
       } else {
         modify_cursor(&cursor, token);
       }
@@ -856,6 +912,20 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         memcpy(terminal->window_title, &token.value[text_start], tlen);
         terminal->window_title[tlen] = '\0';
         terminal->title_dirty = true;
+      } else if (cmd == 10) {
+        const char *val = &token.value[i];
+        int remaining = token.length - i;
+        if (remaining >= 1 && val[0] == '?') {
+          unsigned long fg = terminal->default_fg_rgb;
+          unsigned int r = (fg >> 16) & 0xff;
+          unsigned int g = (fg >> 8) & 0xff;
+          unsigned int b = fg & 0xff;
+          char buf[64];
+          int len = snprintf(buf, sizeof(buf),
+                             "\x1b]10;rgb:%02x%02x/%02x%02x/%02x%02x\x07",
+                             r, r, g, g, b, b);
+          terminal_respond(terminal, buf, len);
+        }
       } else if (cmd == 11) {
         // OSC 11 ; #RRGGBB — set default background color
         const char *val = &token.value[i];

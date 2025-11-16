@@ -1108,6 +1108,7 @@ int main(int argc, char *argv[]) {
   if (term_rows < 1)
     term_rows = 1;
   init_terminal(&terminal, term_cols, term_rows);
+  terminal.default_fg_rgb = (args.fg != -1) ? (unsigned long)args.fg : 0xffffff;
   init_shell(&gui, term_cols, term_rows);
 
   XMapWindow(gui.display, gui.window);
@@ -1156,6 +1157,10 @@ int main(int argc, char *argv[]) {
 
     if (FD_ISSET(gui.pipe_fd, &read_fds)) {
       read_shell_output(&gui, &terminal);
+      if (terminal.response_len > 0) {
+        write(gui.pipe_fd, terminal.response_buf, terminal.response_len);
+        terminal.response_len = 0;
+      }
       if (terminal.title_dirty) {
         XStoreName(gui.display, gui.window, terminal.window_title);
         terminal.title_dirty = false;

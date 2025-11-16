@@ -84,6 +84,11 @@ typedef struct {
   bool mouse_sgr; // SGR extended coordinates (1006)
   unsigned long osc_bg; // packed 0xRRGGBB set by OSC 11
   bool bg_dirty;
+  unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
+  char response_buf[256];
+  int response_len;
+  char title_stack[8][256];
+  int title_stack_depth;
 } Terminal;
 
 typedef enum {
