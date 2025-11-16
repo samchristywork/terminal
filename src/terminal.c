@@ -3,7 +3,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "terminal.h"
+
+static void token_repr(const Term_Token *t, char *buf, int bufsize) {
+  int out = 0;
+  for (int i = 0; i < t->length && out < bufsize - 4; i++) {
+    unsigned char c = (unsigned char)t->value[i];
+    if (isprint(c)) {
+      buf[out++] = c;
+    } else {
+      int n = snprintf(buf + out, bufsize - out, "\\x%02x", c);
+      if (n > 0)
+        out += n;
+    }
+  }
+  buf[out] = '\0';
+}
 
 void init_screen(Term_Screen *screen, int width, int height) {
   memset(&screen->cursor, 0, sizeof(Term_Cursor));
@@ -478,6 +494,10 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
 
     (*cursor)->y = row - 1;
     (*cursor)->x = col - 1;
+  } else {
+    char repr[128];
+    token_repr(&token, repr, sizeof(repr));
+    LOG_WARNING_MSG("unhandled CSI sequence: %s", repr);
   }
 }
 
@@ -851,7 +871,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
             terminal->bg_dirty = true;
           }
         }
+      } else {
+        char repr[128];
+        token_repr(&token, repr, sizeof(repr));
+        LOG_WARNING_MSG("unhandled OSC command %d: %s", cmd, repr);
       }
+    } else {
+      char repr[128];
+      token_repr(&token, repr, sizeof(repr));
+      LOG_WARNING_MSG("unhandled token type %d: %s", token.type, repr);
     }
   }
 
