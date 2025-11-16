@@ -948,6 +948,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
             terminal->bg_dirty = true;
           }
         }
+      } else if (cmd == 7 || cmd == 133) {
+        // OSC 7: current working directory notification
+        // OSC 133: shell integration (FinalTerm semantic zones)
+        // Both are silently accepted
       } else {
         char repr[128];
         token_repr(&token, repr, sizeof(repr));
