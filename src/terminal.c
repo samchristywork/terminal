@@ -79,6 +79,7 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->osc_bg = 0;
   terminal->bg_dirty = false;
   terminal->default_fg_rgb = 0xffffff;
+  terminal->cursor_shape = 0;
   terminal->response_len = 0;
   terminal->title_stack_depth = 0;
   init_screen(&terminal->screen, width, height);
@@ -811,7 +812,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           len = snprintf(buf, sizeof(buf), "\x1b[?1;0c");
         terminal_respond(terminal, buf, len);
       } else if (final == 'q') {
-        // DECSCUSR cursor shape — accept silently
+        // DECSCUSR: space (0x20) must be the intermediate byte
+        if (token.length >= 3 && token.value[token.length - 2] == ' ')
+          terminal->cursor_shape = csi_param(token, 0);
       } else {
         modify_cursor(&cursor, token);
       }

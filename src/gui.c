@@ -385,8 +385,10 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           gui->cursor_visible && !term_screen->cursor_hidden &&
           (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
+      int cursor_shape = terminal->cursor_shape;
+      bool is_block_cursor = is_cursor && (cursor_shape <= 2);
       bool in_selection = cell_in_selection(gui, x, combined);
-      bool reverse = cell.attr.reverse || is_cursor || in_selection;
+      bool reverse = cell.attr.reverse || is_block_cursor || in_selection;
 
       unsigned long text_color;
       if (reverse) {
@@ -432,6 +434,17 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
                     pixel_y + gui->char_height - 1,
                     pixel_x + gui->char_width - 1,
                     pixel_y + gui->char_height - 1);
+        }
+      }
+
+      if (is_cursor && !is_block_cursor) {
+        XSetForeground(gui->display, gui->gc, gui->default_fg);
+        if (cursor_shape == 3 || cursor_shape == 4) {
+          XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
+                         pixel_y + gui->char_height - 2, gui->char_width, 2);
+        } else {
+          XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
+                         pixel_y, 2, gui->char_height);
         }
       }
     }
@@ -1136,8 +1149,9 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &now);
     long elapsed_ms = (now.tv_sec - gui.last_blink.tv_sec) * 1000 +
                       (now.tv_nsec - gui.last_blink.tv_nsec) / 1000000;
+    bool steady = terminal.cursor_shape % 2 == 0 && terminal.cursor_shape != 0;
     if (elapsed_ms >= 500) {
-      gui.cursor_visible = !gui.cursor_visible;
+      gui.cursor_visible = steady ? true : !gui.cursor_visible;
       gui.last_blink = now;
       draw_terminal(&gui, &terminal);
       XFlush(gui.display);
