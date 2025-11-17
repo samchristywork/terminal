@@ -1,10 +1,11 @@
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "log.h"
+#include "screen.h"
 #include "terminal.h"
+#include "tokenize.h"
 
 static void terminal_respond(Terminal *t, const char *data, int len) {
   int available = (int)sizeof(t->response_buf) - t->response_len;
@@ -12,53 +13,6 @@ static void terminal_respond(Terminal *t, const char *data, int len) {
     len = available;
   memcpy(t->response_buf + t->response_len, data, len);
   t->response_len += len;
-}
-
-static void token_repr(const Term_Token *t, char *buf, int bufsize) {
-  int out = 0;
-  for (int i = 0; i < t->length && out < bufsize - 4; i++) {
-    unsigned char c = (unsigned char)t->value[i];
-    if (isprint(c)) {
-      buf[out++] = c;
-    } else {
-      int n = snprintf(buf + out, bufsize - out, "\\x%02x", c);
-      if (n > 0)
-        out += n;
-    }
-  }
-  buf[out] = '\0';
-}
-
-void init_screen(Term_Screen *screen, int width, int height) {
-  memset(&screen->cursor, 0, sizeof(Term_Cursor));
-  screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
-  for (int i = 0; i < height; i++) {
-    screen->lines[i].cells = (Term_Cell *)malloc(width * sizeof(Term_Cell));
-    for (int j = 0; j < width; j++) {
-      memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
-    }
-  }
-  screen->scrollback.lines = malloc(SCROLLBACK_LINES * sizeof(Term_Cell *));
-  screen->scrollback.widths = malloc(SCROLLBACK_LINES * sizeof(int));
-  screen->scrollback.capacity = SCROLLBACK_LINES;
-  screen->scrollback.count = 0;
-  screen->scrollback.head = 0;
-  screen->scroll_offset = 0;
-  screen->scroll_top = 0;
-  screen->scroll_bot = height - 1;
-}
-
-void free_screen(Term_Screen *screen, int height) {
-  for (int i = 0; i < height; i++) {
-    free(screen->lines[i].cells);
-  }
-  free(screen->lines);
-  for (int i = 0; i < screen->scrollback.count; i++) {
-    free(screen->scrollback.lines[(screen->scrollback.head + i) %
-                                  screen->scrollback.capacity]);
-  }
-  free(screen->scrollback.lines);
-  free(screen->scrollback.widths);
 }
 
 void free_terminal(Terminal *terminal) {
@@ -86,23 +40,6 @@ void init_terminal(Terminal *terminal, int width, int height) {
   init_screen(&terminal->alt_screen, width, height);
 }
 
-static void reset_screen(Term_Screen *screen, int width, int height) {
-  memset(&screen->cursor, 0, sizeof(Term_Cursor));
-  memset(&screen->saved_cursor, 0, sizeof(Term_Cursor));
-  for (int i = 0; i < height; i++)
-    for (int j = 0; j < width; j++)
-      memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
-  Term_Scrollback *sb = &screen->scrollback;
-  for (int i = 0; i < sb->count; i++)
-    free(sb->lines[(sb->head + i) % sb->capacity]);
-  sb->count = 0;
-  sb->head = 0;
-  screen->scroll_offset = 0;
-  screen->scroll_top = 0;
-  screen->scroll_bot = height - 1;
-  screen->cursor_hidden = false;
-}
-
 void reset_terminal(Terminal *terminal) {
   reset_screen(&terminal->screen, terminal->width, terminal->height);
   reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
@@ -117,239 +54,28 @@ void reset_terminal(Terminal *terminal) {
   terminal->title_stack_depth = 0;
 }
 
-void scroll_screen(Term_Screen *screen, int width, int height) {
-  (void)height;
-  int top = screen->scroll_top;
-  int bot = screen->scroll_bot;
-
-  if (top == 0) {
-    Term_Scrollback *sb = &screen->scrollback;
-    int idx;
-    if (sb->count < sb->capacity) {
-      idx = (sb->head + sb->count) % sb->capacity;
-      sb->count++;
-    } else {
-      idx = sb->head;
-      free(sb->lines[idx]);
-      sb->head = (sb->head + 1) % sb->capacity;
-    }
-    sb->lines[idx] = malloc(width * sizeof(Term_Cell));
-    memcpy(sb->lines[idx], screen->lines[top].cells, width * sizeof(Term_Cell));
-    sb->widths[idx] = width;
+void resize_terminal(Terminal *terminal, int new_width, int new_height) {
+  if (new_width <= 0 || new_height <= 0) {
+    return;
   }
 
-  for (int j = top; j < bot; j++) {
-    for (int k = 0; k < width; k++) {
-      screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
-    }
+  if (terminal->width == new_width && terminal->height == new_height) {
+    return;
   }
-  for (int k = 0; k < width; k++) {
-    memset(&screen->lines[bot].cells[k], 0, sizeof(Term_Cell));
-  }
+
+  int old_width = terminal->width;
+  int old_height = terminal->height;
+
+  resize_screen(&terminal->screen, old_width, old_height, new_width,
+                new_height);
+  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
+                new_height);
+
+  terminal->width = new_width;
+  terminal->height = new_height;
 }
 
-void handle_newline(Term_Screen *screen, int width, int height) {
-  if (screen->cursor.y == screen->scroll_bot) {
-    scroll_screen(screen, width, height);
-  } else {
-    screen->cursor.y++;
-    if (screen->cursor.y >= height)
-      screen->cursor.y = height - 1;
-  }
-}
-
-void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
-               int start_index, int length) {
-  if (tokens->count % 128 == 0) {
-    Term_Token *new_tokens = (Term_Token *)realloc(
-        tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
-    if (!new_tokens)
-      return;
-    tokens->tokens = new_tokens;
-  }
-  if (length > 255)
-    length = 255;
-  Term_Token *token = &tokens->tokens[tokens->count++];
-  token->type = type;
-  token->length = length;
-  memcpy(token->value, &value[start_index], length);
-  token->value[length] = '\0';
-}
-
-bool is_csi_code(const char *text, int length, int index, int *code_length) {
-  if (index + 2 < length && text[index] == '\x1b' && text[index + 1] == '[') {
-    int i = index + 2;
-    while (i < length && (unsigned char)text[i] >= 0x30 &&
-           (unsigned char)text[i] <= 0x3f) {
-      i++;
-    }
-    while (i < length && (unsigned char)text[i] >= 0x20 &&
-           (unsigned char)text[i] <= 0x2f) {
-      i++;
-    }
-    if (i < length && (unsigned char)text[i] >= 0x40 &&
-        (unsigned char)text[i] <= 0x7e) {
-      *code_length = i - index + 1;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool is_osc_sequence(const char *text, int length, int index, int *seq_length) {
-  if (index + 2 >= length || text[index] != '\x1b' || text[index + 1] != ']')
-    return false;
-  for (int i = index + 2; i < length; i++) {
-    if ((unsigned char)text[i] == 0x07) {
-      *seq_length = i - index + 1;
-      return true;
-    }
-    if (i + 1 < length && text[i] == '\x1b' && text[i + 1] == '\\') {
-      *seq_length = i - index + 2;
-      return true;
-    }
-  }
-  return false;
-}
-
-bool matches(const char *text, int length, int index, const char *pattern,
-             int *pattern_length) {
-  int pat_len = strlen(pattern);
-  if (index + pat_len <= length &&
-      strncmp(&text[index], pattern, pat_len) == 0) {
-    *pattern_length = pat_len;
-    return true;
-  }
-  return false;
-}
-
-Term_Tokens *tokenize(const char *text, int length) {
-  Term_Tokens *tokens = (Term_Tokens *)malloc(sizeof(Term_Tokens));
-  tokens->tokens = (Term_Token *)malloc(128 * sizeof(Term_Token));
-  tokens->count = 0;
-
-  for (int i = 0; i < length; i++) {
-    int len = 0;
-    if (matches(text, length, i, "\n", &len)) {
-      add_token(tokens, TOKEN_NEWLINE, text, i, len);
-    } else if (matches(text, length, i, "\r", &len)) {
-      add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);
-    } else if (matches(text, length, i, "\b", &len) ||
-               (i < length && (unsigned char)text[i] == 0x7f)) {
-      add_token(tokens, TOKEN_BACKSPACE, text, i, 1);
-    } else if (matches(text, length, i, "\x1b[J", &len)) {
-      add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
-    } else if (matches(text, length, i, "\x1b[0J", &len)) {
-      add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
-    } else if (matches(text, length, i, "\x1b[1J", &len)) {
-      add_token(tokens, TOKEN_ERASE_UP, text, i, len);
-    } else if (matches(text, length, i, "\x1b[2J", &len)) {
-      add_token(tokens, TOKEN_ERASE_ALL, text, i, len);
-    } else if (matches(text, length, i, "\x1b[3J", &len)) {
-      add_token(tokens, TOKEN_ERASE_SCROLLBACK, text, i, len);
-    } else if (matches(text, length, i, "\x1b[K", &len)) {
-      add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
-    } else if (matches(text, length, i, "\x1b[0K", &len)) {
-      add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
-    } else if (matches(text, length, i, "\x1b[1K", &len)) {
-      add_token(tokens, TOKEN_ERASE_SOL, text, i, len);
-    } else if (matches(text, length, i, "\x1b[2K", &len)) {
-      add_token(tokens, TOKEN_ERASE_LINE, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
-      add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
-      add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?25l", &len)) {
-      add_token(tokens, TOKEN_CURSOR_HIDE, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?25h", &len)) {
-      add_token(tokens, TOKEN_CURSOR_SHOW, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?2004h", &len)) {
-      add_token(tokens, TOKEN_BRACKETED_PASTE_ON, text, i, len);
-    } else if (matches(text, length, i, "\x1b[?2004l", &len)) {
-      add_token(tokens, TOKEN_BRACKETED_PASTE_OFF, text, i, len);
-    } else if (matches(text, length, i,
-                       "\x1b"
-                       "7",
-                       &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-    } else if (matches(text, length, i,
-                       "\x1b"
-                       "8",
-                       &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-    } else if (matches(text, length, i,
-                       "\x1b"
-                       "M",
-                       &len)) {
-      add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
-    } else if (matches(text, length, i,
-                       "\x1b"
-                       "c",
-                       &len)) {
-      add_token(tokens, TOKEN_FULL_RESET, text, i, len);
-    } else if (i + 1 < length && text[i] == '\x1b' &&
-               (text[i + 1] == '=' || text[i + 1] == '>')) {
-      len = 2; // application/normal keypad mode
-    } else if (i + 2 < length && text[i] == '\x1b' &&
-               (text[i + 1] == '(' || text[i + 1] == ')' ||
-                text[i + 1] == '*' || text[i + 1] == '+')) {
-      len = 3; // character set designation (e.g., \x1b(B)
-    } else if (is_osc_sequence(text, length, i, &len)) {
-      add_token(tokens, TOKEN_OSC, text, i, len);
-    } else if (is_csi_code(text, length, i, &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
-    } else if (matches(text, length, i, "\t", &len)) {
-      add_token(tokens, TOKEN_TAB, text, i, len);
-    } else if (text[i] == '\x07') {
-      // Bell character
-      len = 1;
-    } else {
-      int start = i;
-      while (i < length) {
-        unsigned char c = (unsigned char)text[i];
-        if (c >= 0x20 && c < 0x7f) {
-          i++;
-        } else if (c >= 0x80) {
-          i++; // multi-byte UTF-8 lead or continuation byte
-        } else {
-          break;
-        }
-      }
-      len = i - start;
-      if (len > 0) {
-        for (int k = 0; k < len; k += 255)
-          add_token(tokens, TOKEN_TEXT, text, start + k,
-                    len - k < 255 ? len - k : 255);
-      } else {
-        len = 1; // skip unrecognised byte; prevent i from decrementing
-      }
-      i = start;
-    }
-    i += len - 1;
-  }
-
-  return tokens;
-}
-
-void write_regular_cell(Term_Screen *screen, const char *data, int data_len,
-                        int width, int height, Term_Attr attr) {
-  if (screen->cursor.x >= width) {
-    handle_newline(screen, width, height);
-    screen->cursor.x = 0;
-  }
-
-  if (screen->cursor.y < height) {
-    Term_Cell *cell = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
-    if (data_len > 6)
-      data_len = 6;
-    memcpy(cell->data, data, data_len);
-    cell->length = data_len;
-    cell->attr = attr;
-    screen->cursor.x++;
-  }
-}
-
-void handle_field(Term_Cursor **cursor, int value) {
+static void handle_field(Term_Cursor **cursor, int value) {
   if (value == 0) {
     (*cursor)->attr.fg.color = 0;
     (*cursor)->attr.fg.type = COLOR_DEFAULT;
@@ -385,22 +111,7 @@ void handle_field(Term_Cursor **cursor, int value) {
   }
 }
 
-bool starts_with(const char *str, int length, const char *prefix) {
-  int prefix_len = strlen(prefix);
-  if (length < prefix_len) {
-    return false;
-  }
-  return strncmp(str, prefix, prefix_len) == 0;
-}
-
-bool ends_with(const char *str, int length, char suffix) {
-  if (length < 1) {
-    return false;
-  }
-  return str[length - 1] == suffix;
-}
-
-void modify_cursor(Term_Cursor **cursor, Term_Token token) {
+static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   if (starts_with(token.value, token.length, "\x1b[38;5;")) {
     if (token.length < 8) {
       return;
@@ -513,18 +224,6 @@ void modify_cursor(Term_Cursor **cursor, Term_Token token) {
     token_repr(&token, repr, sizeof(repr));
     LOG_WARNING_MSG("unhandled CSI sequence: %s", repr);
   }
-}
-
-void print_token(Term_Token t) {
-  printf("%d: ", t.type);
-  for (int i = 0; i < t.length; i++) {
-    if (isprint(t.value[i])) {
-      printf("%c", t.value[i]);
-    } else {
-      printf("\\x%02x", (unsigned char)t.value[i]);
-    }
-  }
-  printf("\n");
 }
 
 static int csi_param(Term_Token token, int default_val) {
@@ -967,64 +666,4 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   free(tokens->tokens);
   free(tokens);
   free(combined);
-}
-
-void resize_screen(Term_Screen *screen, int old_width, int old_height,
-                   int new_width, int new_height) {
-  screen->scroll_offset = 0;
-  screen->scroll_top = 0;
-  screen->scroll_bot = new_height - 1;
-
-  Term_Line *new_lines = (Term_Line *)malloc(new_height * sizeof(Term_Line));
-
-  for (int i = 0; i < new_height; i++) {
-    new_lines[i].cells = (Term_Cell *)malloc(new_width * sizeof(Term_Cell));
-    for (int j = 0; j < new_width; j++) {
-      memset(&new_lines[i].cells[j], 0, sizeof(Term_Cell));
-    }
-  }
-
-  int copy_height = (old_height < new_height) ? old_height : new_height;
-  int copy_width = (old_width < new_width) ? old_width : new_width;
-
-  for (int i = 0; i < copy_height; i++) {
-    for (int j = 0; j < copy_width; j++) {
-      new_lines[i].cells[j] = screen->lines[i].cells[j];
-    }
-  }
-
-  for (int i = 0; i < old_height; i++) {
-    free(screen->lines[i].cells);
-  }
-  free(screen->lines);
-
-  screen->lines = new_lines;
-
-  if (screen->cursor.x >= new_width) {
-    screen->cursor.x = new_width - 1;
-  }
-  if (screen->cursor.y >= new_height) {
-    screen->cursor.y = new_height - 1;
-  }
-}
-
-void resize_terminal(Terminal *terminal, int new_width, int new_height) {
-  if (new_width <= 0 || new_height <= 0) {
-    return;
-  }
-
-  if (terminal->width == new_width && terminal->height == new_height) {
-    return;
-  }
-
-  int old_width = terminal->width;
-  int old_height = terminal->height;
-
-  resize_screen(&terminal->screen, old_width, old_height, new_width,
-                new_height);
-  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
-                new_height);
-
-  terminal->width = new_width;
-  terminal->height = new_height;
 }
