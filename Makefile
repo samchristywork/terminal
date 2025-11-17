@@ -1,7 +1,9 @@
 CC = gcc
 CFLAGS = -I/usr/include/freetype2 -Wall -Wextra -O2
 LIBS = -lX11 -lXft -lXrender -lfontconfig -lutil
-OBJS = build/gui.o build/terminal.o build/args.o build/log.o
+OBJS = build/gui.o build/render.o build/events.o build/shell.o \
+       build/terminal.o build/tokenize.o build/screen.o \
+       build/args.o build/log.o
 
 all: gui
 
