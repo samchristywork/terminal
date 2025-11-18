@@ -15,66 +15,6 @@ static void terminal_respond(Terminal *t, const char *data, int len) {
   t->response_len += len;
 }
 
-void free_terminal(Terminal *terminal) {
-  free_screen(&terminal->screen, terminal->height);
-  free_screen(&terminal->alt_screen, terminal->height);
-}
-
-void init_terminal(Terminal *terminal, int width, int height) {
-  terminal->width = width;
-  terminal->height = height;
-  terminal->using_alt_screen = false;
-  terminal->window_title[0] = '\0';
-  terminal->title_dirty = false;
-  terminal->partial_len = 0;
-  terminal->bracketed_paste = false;
-  terminal->mouse_mode = 0;
-  terminal->mouse_sgr = false;
-  terminal->osc_bg = 0;
-  terminal->bg_dirty = false;
-  terminal->default_fg_rgb = 0xffffff;
-  terminal->cursor_shape = 0;
-  terminal->response_len = 0;
-  terminal->title_stack_depth = 0;
-  init_screen(&terminal->screen, width, height);
-  init_screen(&terminal->alt_screen, width, height);
-}
-
-void reset_terminal(Terminal *terminal) {
-  reset_screen(&terminal->screen, terminal->width, terminal->height);
-  reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
-  terminal->using_alt_screen = false;
-  terminal->window_title[0] = '\0';
-  terminal->title_dirty = false;
-  terminal->partial_len = 0;
-  terminal->bracketed_paste = false;
-  terminal->mouse_mode = 0;
-  terminal->mouse_sgr = false;
-  terminal->response_len = 0;
-  terminal->title_stack_depth = 0;
-}
-
-void resize_terminal(Terminal *terminal, int new_width, int new_height) {
-  if (new_width <= 0 || new_height <= 0) {
-    return;
-  }
-
-  if (terminal->width == new_width && terminal->height == new_height) {
-    return;
-  }
-
-  int old_width = terminal->width;
-  int old_height = terminal->height;
-
-  resize_screen(&terminal->screen, old_width, old_height, new_width,
-                new_height);
-  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
-                new_height);
-
-  terminal->width = new_width;
-  terminal->height = new_height;
-}
-
 static void handle_field(Term_Cursor **cursor, int value) {
   if (value == 0) {
     (*cursor)->attr.fg.color = 0;
@@ -113,41 +53,31 @@ static void handle_field(Term_Cursor **cursor, int value) {
 
 static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   if (starts_with(token.value, token.length, "\x1b[38;5;")) {
-    if (token.length < 8) {
+    if (token.length < 8)
       return;
-    }
-
     char num_str[16];
     int num_len = token.length - 8;
-    if (num_len >= (int)sizeof(num_str)) {
+    if (num_len >= (int)sizeof(num_str))
       num_len = (int)sizeof(num_str) - 1;
-    }
     memcpy(num_str, &token.value[7], num_len);
     num_str[num_len] = '\0';
     int num = atoi(num_str);
-    if (num < 0 || num > 255) {
+    if (num < 0 || num > 255)
       return;
-    }
-
     (*cursor)->attr.fg.type = COLOR_256;
     (*cursor)->attr.fg.color = num;
   } else if (starts_with(token.value, token.length, "\x1b[48;5;")) {
-    if (token.length < 8) {
+    if (token.length < 8)
       return;
-    }
-
     char num_str[16];
     int num_len = token.length - 8;
-    if (num_len >= (int)sizeof(num_str)) {
+    if (num_len >= (int)sizeof(num_str))
       num_len = (int)sizeof(num_str) - 1;
-    }
     memcpy(num_str, &token.value[7], num_len);
     num_str[num_len] = '\0';
     int num = atoi(num_str);
-    if (num < 0 || num > 255) {
+    if (num < 0 || num > 255)
       return;
-    }
-
     (*cursor)->attr.bg.type = COLOR_256;
     (*cursor)->attr.bg.color = num;
   } else if (starts_with(token.value, token.length, "\x1b[38;2;")) {
@@ -179,20 +109,16 @@ static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
       (*cursor)->attr.bg.rgb.blue = b < 0 ? 0 : (b > 255 ? 255 : b);
     }
   } else if (ends_with(token.value, token.length, 'm')) {
-    if (token.length < 3) {
+    if (token.length < 3)
       return;
-    }
-
     for (int i = 2; i < token.length - 1;) {
       int j = i;
-      while (j < token.length - 1 && token.value[j] != ';') {
+      while (j < token.length - 1 && token.value[j] != ';')
         j++;
-      }
       char num_str[16];
       int num_len = j - i;
-      if (num_len >= (int)sizeof(num_str)) {
+      if (num_len >= (int)sizeof(num_str))
         num_len = (int)sizeof(num_str) - 1;
-      }
       memcpy(num_str, &token.value[i], num_len);
       num_str[num_len] = '\0';
       int num = atoi(num_str);
@@ -202,21 +128,18 @@ static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   } else if (ends_with(token.value, token.length, 'H') ||
              ends_with(token.value, token.length, 'f')) {
     const char *p = token.value + 2;
-    const char *end = token.value + token.length - 1; // points at 'H' or 'f'
-
+    const char *end = token.value + token.length - 1;
     int row = 0, col = 0;
     while (p < end && *p != ';')
       row = row * 10 + (*p++ - '0');
     if (p < end)
-      p++; // skip ';'
+      p++;
     while (p < end)
       col = col * 10 + (*p++ - '0');
-
     if (row < 1)
       row = 1;
     if (col < 1)
       col = 1;
-
     (*cursor)->y = row - 1;
     (*cursor)->x = col - 1;
   } else {
@@ -280,6 +203,330 @@ static int incomplete_escape_tail(const char *buf, int len) {
   return 0;
 }
 
+static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token) {
+  int width = terminal->width;
+  int height = terminal->height;
+  Term_Cursor *cursor = &screen->cursor;
+  char final = token.value[token.length - 1];
+  int n = csi_param(token, 1);
+
+  if (final == 'A') {
+    cursor->y -= n;
+    if (cursor->y < 0)
+      cursor->y = 0;
+  } else if (final == 'B') {
+    cursor->y += n;
+    if (cursor->y >= height)
+      cursor->y = height - 1;
+  } else if (final == 'C') {
+    cursor->x += n;
+    if (cursor->x >= width)
+      cursor->x = width - 1;
+  } else if (final == 'D') {
+    cursor->x -= n;
+    if (cursor->x < 0)
+      cursor->x = 0;
+  } else if (final == 'E') {
+    cursor->y += n;
+    if (cursor->y >= height)
+      cursor->y = height - 1;
+    cursor->x = 0;
+  } else if (final == 'F') {
+    cursor->y -= n;
+    if (cursor->y < 0)
+      cursor->y = 0;
+    cursor->x = 0;
+  } else if (final == 'G') {
+    cursor->x = n - 1;
+    if (cursor->x < 0)
+      cursor->x = 0;
+    if (cursor->x >= width)
+      cursor->x = width - 1;
+  } else if (final == 'd') {
+    cursor->y = n - 1;
+    if (cursor->y < 0)
+      cursor->y = 0;
+    if (cursor->y >= height)
+      cursor->y = height - 1;
+  } else if (final == '7' || final == 's') {
+    screen->saved_cursor = *cursor;
+  } else if (final == '8' || final == 'u') {
+    *cursor = screen->saved_cursor;
+  } else if (final == 'L') {
+    int bot = screen->scroll_bot;
+    int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
+    for (int j = bot; j >= cursor->y + rows; j--)
+      memcpy(screen->lines[j].cells, screen->lines[j - rows].cells,
+             width * sizeof(Term_Cell));
+    for (int j = cursor->y; j < cursor->y + rows; j++)
+      for (int k = 0; k < width; k++)
+        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'M') {
+    int bot = screen->scroll_bot;
+    int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
+    for (int j = cursor->y; j <= bot - rows; j++)
+      memcpy(screen->lines[j].cells, screen->lines[j + rows].cells,
+             width * sizeof(Term_Cell));
+    for (int j = bot - rows + 1; j <= bot; j++)
+      for (int k = 0; k < width; k++)
+        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'r') {
+    const char *p = token.value + 2;
+    const char *end = token.value + token.length - 1;
+    int top = 0, bot = 0;
+    while (p < end && *p != ';')
+      top = top * 10 + (*p++ - '0');
+    if (p < end)
+      p++;
+    while (p < end)
+      bot = bot * 10 + (*p++ - '0');
+    if (top < 1)
+      top = 1;
+    if (bot < 1 || bot > height)
+      bot = height;
+    if (top < bot) {
+      screen->scroll_top = top - 1;
+      screen->scroll_bot = bot - 1;
+    }
+    cursor->x = 0;
+    cursor->y = 0;
+  } else if (final == '@') {
+    int cols = (n < width - cursor->x) ? n : width - cursor->x;
+    int move = width - cursor->x - cols;
+    if (move > 0)
+      memmove(&screen->lines[cursor->y].cells[cursor->x + cols],
+              &screen->lines[cursor->y].cells[cursor->x],
+              move * sizeof(Term_Cell));
+    for (int k = cursor->x; k < cursor->x + cols; k++)
+      memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'P') {
+    int cols = (n < width - cursor->x) ? n : width - cursor->x;
+    int move = width - cursor->x - cols;
+    if (move > 0)
+      memmove(&screen->lines[cursor->y].cells[cursor->x],
+              &screen->lines[cursor->y].cells[cursor->x + cols],
+              move * sizeof(Term_Cell));
+    for (int k = width - cols; k < width; k++)
+      memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'X') {
+    int cols = (n < width - cursor->x) ? n : width - cursor->x;
+    for (int k = cursor->x; k < cursor->x + cols; k++)
+      memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'h' || final == 'l') {
+    bool enable = (final == 'h');
+    if (starts_with(token.value, token.length, "\x1b[?1000"))
+      terminal->mouse_mode = enable ? 1 : 0;
+    else if (starts_with(token.value, token.length, "\x1b[?1002"))
+      terminal->mouse_mode = enable ? 2 : 0;
+    else if (starts_with(token.value, token.length, "\x1b[?1003"))
+      terminal->mouse_mode = enable ? 3 : 0;
+    else if (starts_with(token.value, token.length, "\x1b[?1006"))
+      terminal->mouse_sgr = enable;
+  } else if (final == 't') {
+    const char *p = token.value + 2;
+    const char *end = token.value + token.length - 1;
+    int n1 = 0, n2 = 0;
+    while (p < end && *p >= '0' && *p <= '9')
+      n1 = n1 * 10 + (*p++ - '0');
+    if (p < end && *p == ';') {
+      p++;
+      while (p < end && *p >= '0' && *p <= '9')
+        n2 = n2 * 10 + (*p++ - '0');
+    }
+    (void)n2;
+    if (n1 == 22) {
+      if (terminal->title_stack_depth < 8) {
+        memcpy(terminal->title_stack[terminal->title_stack_depth],
+               terminal->window_title, 256);
+        terminal->title_stack_depth++;
+      }
+    } else if (n1 == 23) {
+      if (terminal->title_stack_depth > 0) {
+        terminal->title_stack_depth--;
+        memcpy(terminal->window_title,
+               terminal->title_stack[terminal->title_stack_depth], 256);
+        terminal->title_dirty = true;
+      }
+    }
+  } else if (final == 'n') {
+    if (n == 6) {
+      char buf[32];
+      int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dR",
+                         cursor->y + 1, cursor->x + 1);
+      terminal_respond(terminal, buf, len);
+    }
+  } else if (final == 'c') {
+    char buf[32];
+    int len;
+    if (starts_with(token.value, token.length, "\x1b[>"))
+      len = snprintf(buf, sizeof(buf), "\x1b[>0;0;0c");
+    else
+      len = snprintf(buf, sizeof(buf), "\x1b[?1;0c");
+    terminal_respond(terminal, buf, len);
+  } else if (final == 'q') {
+    if (token.length >= 3 && token.value[token.length - 2] == ' ')
+      terminal->cursor_shape = csi_param(token, 0);
+  } else {
+    modify_cursor(&cursor, token);
+  }
+}
+
+static void handle_osc(Terminal *terminal, Term_Token token) {
+  int i = 2;
+  int cmd = 0;
+  while (i < token.length && token.value[i] >= '0' && token.value[i] <= '9')
+    cmd = cmd * 10 + (token.value[i++] - '0');
+  if (i < token.length && token.value[i] == ';')
+    i++;
+
+  if (cmd == 0 || cmd == 1 || cmd == 2) {
+    int text_start = i;
+    int text_end = token.length - 1;
+    if (text_end > text_start && token.value[text_end] == '\\')
+      text_end--;
+    int tlen = text_end - text_start;
+    if (tlen < 0)
+      tlen = 0;
+    if (tlen >= (int)sizeof(terminal->window_title))
+      tlen = sizeof(terminal->window_title) - 1;
+    memcpy(terminal->window_title, &token.value[text_start], tlen);
+    terminal->window_title[tlen] = '\0';
+    terminal->title_dirty = true;
+  } else if (cmd == 10) {
+    const char *val = &token.value[i];
+    int remaining = token.length - i;
+    if (remaining >= 1 && val[0] == '?') {
+      unsigned long fg = terminal->default_fg_rgb;
+      unsigned int r = (fg >> 16) & 0xff;
+      unsigned int g = (fg >> 8) & 0xff;
+      unsigned int b = fg & 0xff;
+      char buf[64];
+      int len = snprintf(buf, sizeof(buf),
+                         "\x1b]10;rgb:%02x%02x/%02x%02x/%02x%02x\x07",
+                         r, r, g, g, b, b);
+      terminal_respond(terminal, buf, len);
+    }
+  } else if (cmd == 11) {
+    const char *val = &token.value[i];
+    int remaining = token.length - i;
+    if (remaining >= 7 && val[0] == '#') {
+      char hex[7];
+      memcpy(hex, val + 1, 6);
+      hex[6] = '\0';
+      char *end;
+      unsigned long rgb = strtoul(hex, &end, 16);
+      if (end == hex + 6) {
+        terminal->osc_bg = rgb;
+        terminal->bg_dirty = true;
+      }
+    }
+  } else if (cmd == 7 || cmd == 133) {
+    // OSC 7: current working directory notification
+    // OSC 133: shell integration (FinalTerm semantic zones)
+  } else {
+    char repr[128];
+    token_repr(&token, repr, sizeof(repr));
+    LOG_WARNING_MSG("unhandled OSC command %d: %s", cmd, repr);
+  }
+}
+
+static void handle_erase(Term_Screen *screen, Term_TokenType type,
+                         int width, int height) {
+  Term_Cursor *cursor = &screen->cursor;
+  switch (type) {
+  case TOKEN_ERASE_EOL:
+    for (int j = cursor->x; j < width; j++)
+      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+    break;
+  case TOKEN_ERASE_SOL:
+    for (int j = 0; j <= cursor->x; j++)
+      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+    break;
+  case TOKEN_ERASE_LINE:
+    for (int j = 0; j < width; j++)
+      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+    break;
+  case TOKEN_ERASE_DOWN:
+    for (int j = cursor->y; j < height; j++)
+      for (int k = 0; k < width; k++) {
+        if (j == cursor->y && k < cursor->x)
+          continue;
+        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+      }
+    break;
+  case TOKEN_ERASE_UP:
+    for (int j = 0; j <= cursor->y; j++)
+      for (int k = 0; k < width; k++) {
+        if (j == cursor->y && k > cursor->x)
+          continue;
+        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+      }
+    break;
+  case TOKEN_ERASE_ALL:
+    for (int j = 0; j < height; j++)
+      for (int k = 0; k < width; k++)
+        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+    break;
+  default:
+    break;
+  }
+}
+
+void free_terminal(Terminal *terminal) {
+  free_screen(&terminal->screen, terminal->height);
+  free_screen(&terminal->alt_screen, terminal->height);
+}
+
+void init_terminal(Terminal *terminal, int width, int height) {
+  terminal->width = width;
+  terminal->height = height;
+  terminal->using_alt_screen = false;
+  terminal->window_title[0] = '\0';
+  terminal->title_dirty = false;
+  terminal->partial_len = 0;
+  terminal->bracketed_paste = false;
+  terminal->mouse_mode = 0;
+  terminal->mouse_sgr = false;
+  terminal->osc_bg = 0;
+  terminal->bg_dirty = false;
+  terminal->default_fg_rgb = 0xffffff;
+  terminal->cursor_shape = 0;
+  terminal->response_len = 0;
+  terminal->title_stack_depth = 0;
+  init_screen(&terminal->screen, width, height);
+  init_screen(&terminal->alt_screen, width, height);
+}
+
+void reset_terminal(Terminal *terminal) {
+  reset_screen(&terminal->screen, terminal->width, terminal->height);
+  reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
+  terminal->using_alt_screen = false;
+  terminal->window_title[0] = '\0';
+  terminal->title_dirty = false;
+  terminal->partial_len = 0;
+  terminal->bracketed_paste = false;
+  terminal->mouse_mode = 0;
+  terminal->mouse_sgr = false;
+  terminal->response_len = 0;
+  terminal->title_stack_depth = 0;
+}
+
+void resize_terminal(Terminal *terminal, int new_width, int new_height) {
+  if (new_width <= 0 || new_height <= 0)
+    return;
+  if (terminal->width == new_width && terminal->height == new_height)
+    return;
+
+  int old_width = terminal->width;
+  int old_height = terminal->height;
+
+  resize_screen(&terminal->screen, old_width, old_height, new_width, new_height);
+  resize_screen(&terminal->alt_screen, old_width, old_height, new_width, new_height);
+
+  terminal->width = new_width;
+  terminal->height = new_height;
+}
+
 void write_terminal(Terminal *terminal, const char *text, int length) {
   char *combined = NULL;
   int combined_len = length;
@@ -298,8 +545,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   int tail = incomplete_escape_tail(text, combined_len);
   if (tail >= combined_len) {
     int save = tail < (int)sizeof(terminal->partial_buf)
-                   ? tail
-                   : (int)sizeof(terminal->partial_buf) - 1;
+                   ? tail : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text, save);
     terminal->partial_len = save;
     free(combined);
@@ -307,8 +553,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   }
   if (tail > 0) {
     int save = tail < (int)sizeof(terminal->partial_buf)
-                   ? tail
-                   : (int)sizeof(terminal->partial_buf) - 1;
+                   ? tail : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text + combined_len - tail, save);
     terminal->partial_len = save;
     combined_len -= tail;
@@ -323,267 +568,86 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   active->scroll_offset = 0;
 
 #ifdef DEBUG
-  for (int i = 0; i < tokens->count; i++) {
-    Term_Token token = tokens->tokens[i];
-    print_token(token);
-  }
+  for (int i = 0; i < tokens->count; i++)
+    print_token(tokens->tokens[i]);
 #endif
 
   for (int i = 0; i < tokens->count; i++) {
     Term_Token token = tokens->tokens[i];
-
     Term_Screen *screen =
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     Term_Cursor *cursor = &screen->cursor;
-    if (token.type == TOKEN_TEXT) {
+
+    switch (token.type) {
+    case TOKEN_TEXT: {
       int j = 0;
       while (j < token.length) {
         unsigned char c = (unsigned char)token.value[j];
         int char_len;
-        if (c < 0x80)
-          char_len = 1;
-        else if (c < 0xE0)
-          char_len = 2;
-        else if (c < 0xF0)
-          char_len = 3;
-        else
-          char_len = 4;
+        if (c < 0x80) char_len = 1;
+        else if (c < 0xE0) char_len = 2;
+        else if (c < 0xF0) char_len = 3;
+        else char_len = 4;
         if (j + char_len > token.length)
           char_len = token.length - j;
         write_regular_cell(screen, &token.value[j], char_len, width, height,
                            cursor->attr);
         j += char_len;
       }
-    } else if (token.type == TOKEN_NEWLINE) {
+      break;
+    }
+    case TOKEN_NEWLINE:
       handle_newline(screen, width, height);
-    } else if (token.type == TOKEN_CARRIAGE_RETURN) {
+      break;
+    case TOKEN_CARRIAGE_RETURN:
       cursor->x = 0;
-    } else if (token.type == TOKEN_CSI_CODE) {
-      char final = token.value[token.length - 1];
-      int n = csi_param(token, 1);
-      if (final == 'A') {
-        cursor->y -= n;
-        if (cursor->y < 0)
-          cursor->y = 0;
-      } else if (final == 'B') {
-        cursor->y += n;
-        if (cursor->y >= height)
-          cursor->y = height - 1;
-      } else if (final == 'C') {
-        cursor->x += n;
-        if (cursor->x >= width)
-          cursor->x = width - 1;
-      } else if (final == 'D') {
-        cursor->x -= n;
-        if (cursor->x < 0)
-          cursor->x = 0;
-      } else if (final == 'E') {
-        cursor->y += n;
-        if (cursor->y >= height)
-          cursor->y = height - 1;
-        cursor->x = 0;
-      } else if (final == 'F') {
-        cursor->y -= n;
-        if (cursor->y < 0)
-          cursor->y = 0;
-        cursor->x = 0;
-      } else if (final == 'G') {
-        cursor->x = n - 1;
-        if (cursor->x < 0)
-          cursor->x = 0;
-        if (cursor->x >= width)
-          cursor->x = width - 1;
-      } else if (final == 'd') {
-        cursor->y = n - 1;
-        if (cursor->y < 0)
-          cursor->y = 0;
-        if (cursor->y >= height)
-          cursor->y = height - 1;
-      } else if (final == '7' || final == 's') {
-        screen->saved_cursor = *cursor;
-      } else if (final == '8' || final == 'u') {
-        *cursor = screen->saved_cursor;
-      } else if (final == 'L') {
-        int bot = screen->scroll_bot;
-        int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
-        for (int j = bot; j >= cursor->y + rows; j--)
-          memcpy(screen->lines[j].cells, screen->lines[j - rows].cells,
-                 width * sizeof(Term_Cell));
-        for (int j = cursor->y; j < cursor->y + rows; j++)
-          for (int k = 0; k < width; k++)
-            memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
-      } else if (final == 'M') {
-        int bot = screen->scroll_bot;
-        int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
-        for (int j = cursor->y; j <= bot - rows; j++)
-          memcpy(screen->lines[j].cells, screen->lines[j + rows].cells,
-                 width * sizeof(Term_Cell));
-        for (int j = bot - rows + 1; j <= bot; j++)
-          for (int k = 0; k < width; k++)
-            memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
-      } else if (final == 'r') {
-        const char *p = token.value + 2;
-        const char *end = token.value + token.length - 1;
-        int top = 0, bot = 0;
-        while (p < end && *p != ';')
-          top = top * 10 + (*p++ - '0');
-        if (p < end)
-          p++;
-        while (p < end)
-          bot = bot * 10 + (*p++ - '0');
-        if (top < 1)
-          top = 1;
-        if (bot < 1 || bot > height)
-          bot = height;
-        if (top < bot) {
-          screen->scroll_top = top - 1;
-          screen->scroll_bot = bot - 1;
-        }
-        cursor->x = 0;
-        cursor->y = 0;
-      } else if (final == '@') {
-        int cols = (n < width - cursor->x) ? n : width - cursor->x;
-        int move = width - cursor->x - cols;
-        if (move > 0)
-          memmove(&screen->lines[cursor->y].cells[cursor->x + cols],
-                  &screen->lines[cursor->y].cells[cursor->x],
-                  move * sizeof(Term_Cell));
-        for (int k = cursor->x; k < cursor->x + cols; k++)
-          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
-      } else if (final == 'P') {
-        int cols = (n < width - cursor->x) ? n : width - cursor->x;
-        int move = width - cursor->x - cols;
-        if (move > 0)
-          memmove(&screen->lines[cursor->y].cells[cursor->x],
-                  &screen->lines[cursor->y].cells[cursor->x + cols],
-                  move * sizeof(Term_Cell));
-        for (int k = width - cols; k < width; k++)
-          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
-      } else if (final == 'X') {
-        int cols = (n < width - cursor->x) ? n : width - cursor->x;
-        for (int k = cursor->x; k < cursor->x + cols; k++)
-          memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
-      } else if (final == 'h' || final == 'l') {
-        bool enable = (final == 'h');
-        if (starts_with(token.value, token.length, "\x1b[?1000"))
-          terminal->mouse_mode = enable ? 1 : 0;
-        else if (starts_with(token.value, token.length, "\x1b[?1002"))
-          terminal->mouse_mode = enable ? 2 : 0;
-        else if (starts_with(token.value, token.length, "\x1b[?1003"))
-          terminal->mouse_mode = enable ? 3 : 0;
-        else if (starts_with(token.value, token.length, "\x1b[?1006"))
-          terminal->mouse_sgr = enable;
-      } else if (final == 't') {
-        const char *p = token.value + 2;
-        const char *end = token.value + token.length - 1;
-        int n1 = 0, n2 = 0;
-        while (p < end && *p >= '0' && *p <= '9')
-          n1 = n1 * 10 + (*p++ - '0');
-        if (p < end && *p == ';') {
-          p++;
-          while (p < end && *p >= '0' && *p <= '9')
-            n2 = n2 * 10 + (*p++ - '0');
-        }
-        (void)n2;
-        if (n1 == 22) {
-          if (terminal->title_stack_depth < 8) {
-            memcpy(terminal->title_stack[terminal->title_stack_depth],
-                   terminal->window_title, 256);
-            terminal->title_stack_depth++;
-          }
-        } else if (n1 == 23) {
-          if (terminal->title_stack_depth > 0) {
-            terminal->title_stack_depth--;
-            memcpy(terminal->window_title,
-                   terminal->title_stack[terminal->title_stack_depth], 256);
-            terminal->title_dirty = true;
-          }
-        }
-      } else if (final == 'n') {
-        if (n == 6) {
-          char buf[32];
-          int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dR",
-                             cursor->y + 1, cursor->x + 1);
-          terminal_respond(terminal, buf, len);
-        }
-      } else if (final == 'c') {
-        char buf[32];
-        int len;
-        if (starts_with(token.value, token.length, "\x1b[>"))
-          len = snprintf(buf, sizeof(buf), "\x1b[>0;0;0c");
-        else
-          len = snprintf(buf, sizeof(buf), "\x1b[?1;0c");
-        terminal_respond(terminal, buf, len);
-      } else if (final == 'q') {
-        // DECSCUSR: space (0x20) must be the intermediate byte
-        if (token.length >= 3 && token.value[token.length - 2] == ' ')
-          terminal->cursor_shape = csi_param(token, 0);
-      } else {
-        modify_cursor(&cursor, token);
-      }
-    } else if (token.type == TOKEN_ERASE_EOL) {
-      for (int j = cursor->x; j < width; j++) {
-        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
-      }
-    } else if (token.type == TOKEN_ERASE_SOL) {
-      for (int j = 0; j <= cursor->x; j++) {
-        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
-      }
-    } else if (token.type == TOKEN_ERASE_LINE) {
-      for (int j = 0; j < width; j++) {
-        memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
-      }
-    } else if (token.type == TOKEN_ERASE_DOWN) {
-      for (int j = cursor->y; j < height; j++) {
-        for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k < cursor->x) {
-            continue;
-          }
-          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
-        }
-      }
-    } else if (token.type == TOKEN_ERASE_UP) {
-      for (int j = 0; j <= cursor->y; j++) {
-        for (int k = 0; k < width; k++) {
-          if (j == cursor->y && k > cursor->x) {
-            continue;
-          }
-          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
-        }
-      }
-    } else if (token.type == TOKEN_ERASE_ALL) {
-      for (int j = 0; j < height; j++) {
-        for (int k = 0; k < width; k++) {
-          memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
-        }
-      }
-    } else if (token.type == TOKEN_ERASE_SCROLLBACK) {
-    } else if (token.type == TOKEN_ALT_SCREEN) {
+      break;
+    case TOKEN_CSI_CODE:
+      handle_csi(terminal, screen, token);
+      break;
+    case TOKEN_ERASE_EOL:
+    case TOKEN_ERASE_SOL:
+    case TOKEN_ERASE_LINE:
+    case TOKEN_ERASE_DOWN:
+    case TOKEN_ERASE_UP:
+    case TOKEN_ERASE_ALL:
+    case TOKEN_ERASE_SCROLLBACK:
+      handle_erase(screen, token.type, width, height);
+      break;
+    case TOKEN_ALT_SCREEN:
       terminal->using_alt_screen = true;
-    } else if (token.type == TOKEN_MAIN_SCREEN) {
+      break;
+    case TOKEN_MAIN_SCREEN:
       terminal->using_alt_screen = false;
-    } else if (token.type == TOKEN_CURSOR_HIDE) {
+      break;
+    case TOKEN_CURSOR_HIDE:
       screen->cursor_hidden = true;
-    } else if (token.type == TOKEN_CURSOR_SHOW) {
+      break;
+    case TOKEN_CURSOR_SHOW:
       screen->cursor_hidden = false;
-    } else if (token.type == TOKEN_BRACKETED_PASTE_ON) {
+      break;
+    case TOKEN_BRACKETED_PASTE_ON:
       terminal->bracketed_paste = true;
-    } else if (token.type == TOKEN_BRACKETED_PASTE_OFF) {
+      break;
+    case TOKEN_BRACKETED_PASTE_OFF:
       terminal->bracketed_paste = false;
-    } else if (token.type == TOKEN_FULL_RESET) {
+      break;
+    case TOKEN_FULL_RESET:
       reset_terminal(terminal);
-    } else if (token.type == TOKEN_TAB) {
+      break;
+    case TOKEN_TAB: {
       int next_tab_stop = ((cursor->x / 8) + 1) * 8;
-      if (next_tab_stop >= width) {
+      if (next_tab_stop >= width)
         handle_newline(screen, width, height);
-      } else {
+      else
         cursor->x = next_tab_stop;
-      }
-    } else if (token.type == TOKEN_BACKSPACE) {
-      if (cursor->x > 0) {
+      break;
+    }
+    case TOKEN_BACKSPACE:
+      if (cursor->x > 0)
         cursor->x--;
-      }
-    } else if (token.type == TOKEN_REVERSE_INDEX) {
+      break;
+    case TOKEN_REVERSE_INDEX:
       if (cursor->y > screen->scroll_top) {
         cursor->y--;
       } else if (cursor->y == screen->scroll_top) {
@@ -596,70 +660,16 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         if (cursor->y > 0)
           cursor->y--;
       }
-    } else if (token.type == TOKEN_OSC) {
-      // Parse: ESC ] cmd ; text BEL/ST
-      int i = 2;
-      int cmd = 0;
-      while (i < token.length && token.value[i] >= '0' && token.value[i] <= '9')
-        cmd = cmd * 10 + (token.value[i++] - '0');
-      if (i < token.length && token.value[i] == ';')
-        i++;
-      if (cmd == 0 || cmd == 1 || cmd == 2) {
-        int text_start = i;
-        // stop before BEL or ESC (ST)
-        int text_end = token.length - 1;
-        if (text_end > text_start && token.value[text_end] == '\\')
-          text_end--; // strip the '\\' of ESC-backslash ST
-        int tlen = text_end - text_start;
-        if (tlen < 0)
-          tlen = 0;
-        if (tlen >= (int)sizeof(terminal->window_title))
-          tlen = sizeof(terminal->window_title) - 1;
-        memcpy(terminal->window_title, &token.value[text_start], tlen);
-        terminal->window_title[tlen] = '\0';
-        terminal->title_dirty = true;
-      } else if (cmd == 10) {
-        const char *val = &token.value[i];
-        int remaining = token.length - i;
-        if (remaining >= 1 && val[0] == '?') {
-          unsigned long fg = terminal->default_fg_rgb;
-          unsigned int r = (fg >> 16) & 0xff;
-          unsigned int g = (fg >> 8) & 0xff;
-          unsigned int b = fg & 0xff;
-          char buf[64];
-          int len = snprintf(buf, sizeof(buf),
-                             "\x1b]10;rgb:%02x%02x/%02x%02x/%02x%02x\x07",
-                             r, r, g, g, b, b);
-          terminal_respond(terminal, buf, len);
-        }
-      } else if (cmd == 11) {
-        // OSC 11 ; #RRGGBB — set default background color
-        const char *val = &token.value[i];
-        int remaining = token.length - i;
-        if (remaining >= 7 && val[0] == '#') {
-          char hex[7];
-          memcpy(hex, val + 1, 6);
-          hex[6] = '\0';
-          char *end;
-          unsigned long rgb = strtoul(hex, &end, 16);
-          if (end == hex + 6) {
-            terminal->osc_bg = rgb;
-            terminal->bg_dirty = true;
-          }
-        }
-      } else if (cmd == 7 || cmd == 133) {
-        // OSC 7: current working directory notification
-        // OSC 133: shell integration (FinalTerm semantic zones)
-        // Both are silently accepted
-      } else {
-        char repr[128];
-        token_repr(&token, repr, sizeof(repr));
-        LOG_WARNING_MSG("unhandled OSC command %d: %s", cmd, repr);
-      }
-    } else {
+      break;
+    case TOKEN_OSC:
+      handle_osc(terminal, token);
+      break;
+    default: {
       char repr[128];
       token_repr(&token, repr, sizeof(repr));
       LOG_WARNING_MSG("unhandled token type %d: %s", token.type, repr);
+      break;
+    }
     }
   }
 
