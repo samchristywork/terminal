@@ -527,6 +527,42 @@ void resize_terminal(Terminal *terminal, int new_width, int new_height) {
   terminal->height = new_height;
 }
 
+static int incomplete_utf8_len(const char *buf, int len) {
+  if (len <= 0)
+    return 0;
+
+  int i = len - 1;
+  while (i >= 0 && (unsigned char)buf[i] >= 0x80 &&
+         (unsigned char)buf[i] < 0xc0) {
+    i--;
+  }
+
+  if (i < 0) {
+    if (len > 0 && (unsigned char)buf[0] >= 0x80 && (unsigned char)buf[0] < 0xc0)
+      return len > 3 ? 0 : len;
+    return 0;
+  }
+
+  unsigned char c = (unsigned char)buf[i];
+  int expected = 0;
+  if (c < 0x80)
+    return 0;
+  else if ((c & 0xe0) == 0xc0)
+    expected = 2;
+  else if ((c & 0xf0) == 0xe0)
+    expected = 3;
+  else if ((c & 0xf8) == 0xf0)
+    expected = 4;
+  else
+    return 0;
+
+  int have = len - i;
+  if (have < expected)
+    return have;
+
+  return 0;
+}
+
 void write_terminal(Terminal *terminal, const char *text, int length) {
   char *combined = NULL;
   int combined_len = length;
@@ -543,6 +579,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   }
 
   int tail = incomplete_escape_tail(text, combined_len);
+  if (tail <= 0)
+    tail = incomplete_utf8_len(text, combined_len);
+
   if (tail >= combined_len) {
     int save = tail < (int)sizeof(terminal->partial_buf)
                    ? tail : (int)sizeof(terminal->partial_buf) - 1;
