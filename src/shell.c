@@ -5,9 +5,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "gui.h"
 #include "log.h"
-#include "terminal.h"
+#include "shell.h"
 
 void init_shell(GuiContext *gui, int cols, int rows) {
   int master, slave;

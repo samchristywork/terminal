@@ -7,8 +7,9 @@
 #include <X11/keysym.h>
 #include <X11/Xutil.h>
 
-#include "gui.h"
+#include "events.h"
 #include "log.h"
+#include "render.h"
 
 static void send_mouse_event(GuiContext *gui, Terminal *terminal, int btn,
                              int x, int y, bool release) {

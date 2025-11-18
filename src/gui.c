@@ -6,9 +6,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "args.h"
+#include "events.h"
 #include "gui.h"
 #include "log.h"
+#include "render.h"
+#include "shell.h"
 #include "terminal.h"
 
 int init_gui(GuiContext *gui, Args *args) {

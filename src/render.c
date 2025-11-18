@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "gui.h"
+#include "render.h"
 
 void init_colors(GuiContext *gui, Args *args) {
   Colormap colormap = DefaultColormap(gui->display, gui->screen);

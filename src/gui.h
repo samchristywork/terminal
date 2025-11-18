@@ -9,7 +9,6 @@
 #include <time.h>
 
 #include "args.h"
-#include "terminal.h"
 
 typedef struct {
   Display *display;
@@ -53,17 +52,6 @@ typedef struct {
   bool rgb_cache_valid[64];
   int rgb_cache_next;
 } GuiContext;
-
-void init_colors(GuiContext *gui, Args *args);
-void build_selection_text(GuiContext *gui, Terminal *terminal);
-unsigned long get_color_pixel(GuiContext *gui, Term_Color color);
-XftColor *get_xft_color(GuiContext *gui, Term_Color color);
-void draw_terminal(GuiContext *gui, Terminal *terminal);
-
-void handle_events(GuiContext *gui, Terminal *terminal, XEvent *event);
-
-void init_shell(GuiContext *gui, int cols, int rows);
-void read_shell_output(GuiContext *gui, Terminal *terminal);
 
 int init_gui(GuiContext *gui, Args *args);
 void cleanup_gui(GuiContext *gui);
