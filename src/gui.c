@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
     term_cols = 1;
   if (term_rows < 1)
     term_rows = 1;
-  init_terminal(&terminal, term_cols, term_rows);
+  init_terminal(&terminal, term_cols, term_rows, args.scrollback);
   terminal.default_fg_rgb = (args.fg != -1) ? (unsigned long)args.fg : 0xffffff;
   init_shell(&gui, term_cols, term_rows);
 

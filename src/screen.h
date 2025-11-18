@@ -3,7 +3,7 @@
 
 #include "terminal.h"
 
-void init_screen(Term_Screen *screen, int width, int height);
+void init_screen(Term_Screen *screen, int width, int height, int scrollback_lines);
 void free_screen(Term_Screen *screen, int height);
 void reset_screen(Term_Screen *screen, int width, int height);
 void scroll_screen(Term_Screen *screen, int width, int height);

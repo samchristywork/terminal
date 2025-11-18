@@ -3,8 +3,6 @@
 
 #include <stdbool.h>
 
-#define SCROLLBACK_LINES 1000
-
 typedef struct {
   int red;
   int green;
@@ -130,7 +128,7 @@ typedef struct {
   int count;
 } Term_Tokens;
 
-void init_terminal(Terminal *terminal, int width, int height);
+void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines);
 
 void reset_terminal(Terminal *terminal);
 

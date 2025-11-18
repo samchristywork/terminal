@@ -8,6 +8,8 @@ void print_usage(const char *program_name) {
   fprintf(stderr, "Usage: %s [OPTIONS]\n", program_name);
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "  --font-size SIZE      Set font size (default: 14)\n");
+  fprintf(stderr,
+          "  --scrollback N        Scrollback buffer size (default: 1000)\n");
   fprintf(
       stderr,
       "  --font PATTERN        Fontconfig font pattern (e.g. 'Monospace')\n");
@@ -24,6 +26,7 @@ void print_usage(const char *program_name) {
 
 void parse_args(int argc, char *argv[], Args *args) {
   args->font_size = 14;
+  args->scrollback = 1000;
   args->log_file = NULL;
   args->font = NULL;
   args->fg = -1;
@@ -32,7 +35,18 @@ void parse_args(int argc, char *argv[], Args *args) {
     args->palette[i] = -1;
 
   for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--font-size") == 0) {
+    if (strcmp(argv[i], "--scrollback") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --scrollback requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      args->scrollback = atoi(argv[++i]);
+      if (args->scrollback <= 0) {
+        fprintf(stderr, "Error: scrollback must be positive\n");
+        exit(1);
+      }
+    } else if (strcmp(argv[i], "--font-size") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "Error: --font-size requires an argument\n");
         print_usage(argv[0]);

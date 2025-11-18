@@ -4,7 +4,7 @@
 #include "screen.h"
 #include "terminal.h"
 
-void init_screen(Term_Screen *screen, int width, int height) {
+void init_screen(Term_Screen *screen, int width, int height, int scrollback_lines) {
   memset(&screen->cursor, 0, sizeof(Term_Cursor));
   screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
   for (int i = 0; i < height; i++) {
@@ -13,9 +13,9 @@ void init_screen(Term_Screen *screen, int width, int height) {
       memset(&screen->lines[i].cells[j], 0, sizeof(Term_Cell));
     }
   }
-  screen->scrollback.lines = malloc(SCROLLBACK_LINES * sizeof(Term_Cell *));
-  screen->scrollback.widths = malloc(SCROLLBACK_LINES * sizeof(int));
-  screen->scrollback.capacity = SCROLLBACK_LINES;
+  screen->scrollback.lines = malloc(scrollback_lines * sizeof(Term_Cell *));
+  screen->scrollback.widths = malloc(scrollback_lines * sizeof(int));
+  screen->scrollback.capacity = scrollback_lines;
   screen->scrollback.count = 0;
   screen->scrollback.head = 0;
   screen->scroll_offset = 0;

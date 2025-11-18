@@ -3,6 +3,7 @@
 
 typedef struct {
   int font_size;
+  int scrollback;
   char *log_file;
   char *font;       // NULL = use bundled FreeMono
   long fg;          // -1 = default white

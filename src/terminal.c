@@ -477,7 +477,7 @@ void free_terminal(Terminal *terminal) {
   free_screen(&terminal->alt_screen, terminal->height);
 }
 
-void init_terminal(Terminal *terminal, int width, int height) {
+void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines) {
   terminal->width = width;
   terminal->height = height;
   terminal->using_alt_screen = false;
@@ -493,8 +493,8 @@ void init_terminal(Terminal *terminal, int width, int height) {
   terminal->cursor_shape = 0;
   terminal->response_len = 0;
   terminal->title_stack_depth = 0;
-  init_screen(&terminal->screen, width, height);
-  init_screen(&terminal->alt_screen, width, height);
+  init_screen(&terminal->screen, width, height, scrollback_lines);
+  init_screen(&terminal->alt_screen, width, height, scrollback_lines);
 }
 
 void reset_terminal(Terminal *terminal) {
