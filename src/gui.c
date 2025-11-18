@@ -1,6 +1,8 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -56,6 +58,8 @@ int init_gui(GuiContext *gui, Args *args) {
   XSetBackground(gui->display, gui->gc, gui->black);
 
   char font_pattern[1024];
+  char regular_base[256] = "";
+  char bold_base[256] = "";
   char exe_path[512];
   char exe_dir[512];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
@@ -73,11 +77,17 @@ int init_gui(GuiContext *gui, Args *args) {
   }
 
   if (args->font) {
-    if (strstr(args->font, "size="))
+    char *size_pos = strstr(args->font, ":size=");
+    if (size_pos) {
+      int base_len = (int)(size_pos - args->font);
+      memcpy(regular_base, args->font, base_len);
+      regular_base[base_len] = '\0';
       snprintf(font_pattern, sizeof(font_pattern), "%s", args->font);
-    else
+    } else {
+      snprintf(regular_base, sizeof(regular_base), "%s", args->font);
       snprintf(font_pattern, sizeof(font_pattern), "%s:size=%d", args->font,
                font_size);
+    }
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (!gui->font) {
       fprintf(stderr, "Cannot load font '%s'\n", args->font);
@@ -90,7 +100,9 @@ int init_gui(GuiContext *gui, Args *args) {
     snprintf(font_pattern, sizeof(font_pattern),
              "Iosevka Nerd Font Mono:size=%d", font_size);
     gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
-    if (!gui->font) {
+    if (gui->font) {
+      snprintf(regular_base, sizeof(regular_base), "Iosevka Nerd Font Mono");
+    } else {
       LOG_WARNING_MSG("Cannot load Iosevka font, trying FreeMono");
       char repo_dir[512];
       char *sep = strrchr(exe_dir, '/');
@@ -111,12 +123,16 @@ int init_gui(GuiContext *gui, Args *args) {
       snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d",
                font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
+      if (gui->font)
+        snprintf(regular_base, sizeof(regular_base), "FreeMono");
     }
     if (!gui->font) {
       LOG_WARNING_MSG("Cannot load FreeMono font, trying monospace fallback");
       snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d",
                font_size);
       gui->font = XftFontOpenName(gui->display, gui->screen, font_pattern);
+      if (gui->font)
+        snprintf(regular_base, sizeof(regular_base), "monospace");
     }
     if (!gui->font) {
       fprintf(stderr, "Cannot load any suitable font\n");
@@ -128,15 +144,24 @@ int init_gui(GuiContext *gui, Args *args) {
     snprintf(font_pattern, sizeof(font_pattern),
              "Iosevka Nerd Font Mono:weight=bold:size=%d", font_size);
     gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
-    if (!gui->font_bold) {
+    if (gui->font_bold) {
+      snprintf(bold_base, sizeof(bold_base),
+               "Iosevka Nerd Font Mono:weight=bold");
+    } else {
       snprintf(font_pattern, sizeof(font_pattern),
                "monospace:weight=bold:size=%d", font_size);
       gui->font_bold = XftFontOpenName(gui->display, gui->screen, font_pattern);
+      if (gui->font_bold)
+        snprintf(bold_base, sizeof(bold_base), "monospace:weight=bold");
     }
     if (!gui->font_bold)
       gui->font_bold = gui->font;
   }
   LOG_INFO_MSG("Loaded font: %s", font_pattern);
+
+  gui->font_size = font_size;
+  snprintf(gui->font_base, sizeof(gui->font_base), "%s", regular_base);
+  snprintf(gui->font_bold_base, sizeof(gui->font_bold_base), "%s", bold_base);
 
   gui->char_width = gui->font->max_advance_width;
   if (gui->font_bold && gui->font_bold != gui->font &&
@@ -161,6 +186,74 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->rgb_cache_next = 0;
 
   return 0;
+}
+
+void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
+  int new_size = gui->font_size + delta;
+  if (new_size < 6 || new_size > 72)
+    return;
+
+  bool bold_separate = (gui->font_bold != gui->font);
+  XftFontClose(gui->display, gui->font);
+  if (bold_separate)
+    XftFontClose(gui->display, gui->font_bold);
+
+  char pattern[512];
+  snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_base, new_size);
+  gui->font = XftFontOpenName(gui->display, gui->screen, pattern);
+  if (!gui->font) {
+    snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_base,
+             gui->font_size);
+    gui->font = XftFontOpenName(gui->display, gui->screen, pattern);
+    if (!gui->font)
+      return;
+    if (gui->font_bold_base[0]) {
+      snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_bold_base,
+               gui->font_size);
+      gui->font_bold = XftFontOpenName(gui->display, gui->screen, pattern);
+      if (!gui->font_bold)
+        gui->font_bold = gui->font;
+    } else {
+      gui->font_bold = gui->font;
+    }
+    return;
+  }
+
+  if (gui->font_bold_base[0]) {
+    snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_bold_base,
+             new_size);
+    gui->font_bold = XftFontOpenName(gui->display, gui->screen, pattern);
+    if (!gui->font_bold)
+      gui->font_bold = gui->font;
+  } else {
+    gui->font_bold = gui->font;
+  }
+
+  gui->font_size = new_size;
+  gui->char_width = gui->font->max_advance_width;
+  if (gui->font_bold != gui->font &&
+      gui->font_bold->max_advance_width > gui->char_width)
+    gui->char_width = gui->font_bold->max_advance_width;
+  gui->char_height = gui->font->ascent + gui->font->descent;
+  gui->char_ascent = gui->font->ascent;
+
+  int term_cols = (gui->window_width - 20) / gui->char_width;
+  int term_rows = (gui->window_height - 20) / gui->char_height;
+  if (term_cols < 1)
+    term_cols = 1;
+  if (term_rows < 1)
+    term_rows = 1;
+
+  resize_terminal(terminal, term_cols, term_rows);
+
+  struct winsize ws = {
+      .ws_row = term_rows, .ws_col = term_cols,
+      .ws_xpixel = 0,      .ws_ypixel = 0,
+  };
+  ioctl(gui->pipe_fd, TIOCSWINSZ, &ws);
+  kill(gui->child_pid, SIGWINCH);
+
+  draw_terminal(gui, terminal);
 }
 
 void cleanup_gui(GuiContext *gui) {

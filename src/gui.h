@@ -9,6 +9,7 @@
 #include <time.h>
 
 #include "args.h"
+#include "terminal.h"
 
 typedef struct {
   Display *display;
@@ -51,9 +52,13 @@ typedef struct {
   int rgb_cache_keys[64];
   bool rgb_cache_valid[64];
   int rgb_cache_next;
+  int font_size;
+  char font_base[256];
+  char font_bold_base[256];
 } GuiContext;
 
 int init_gui(GuiContext *gui, Args *args);
 void cleanup_gui(GuiContext *gui);
+void change_font_size(GuiContext *gui, Terminal *terminal, int delta);
 
 #endif

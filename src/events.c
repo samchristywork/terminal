@@ -141,6 +141,11 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     write(gui->pipe_fd, "\x1b[5~", 4);
   } else if (keysym == XK_Next) {
     write(gui->pipe_fd, "\x1b[6~", 4);
+  } else if ((keysym == XK_plus || keysym == XK_equal) &&
+             (ev->state & ControlMask)) {
+    change_font_size(gui, terminal, 1);
+  } else if (keysym == XK_minus && (ev->state & ControlMask)) {
+    change_font_size(gui, terminal, -1);
   } else if (keysym >= XK_F1 && keysym <= XK_F12) {
     const char *fkeys[] = {
         "\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",
