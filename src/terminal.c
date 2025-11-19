@@ -420,6 +420,102 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
   }
 }
 
+static bool parse_color(const char *val, int len, unsigned long *rgb) {
+  if (len < 1)
+    return false;
+
+  if (val[0] == '#') {
+    if (len == 4) { // #RGB
+      char r[2] = {val[1], val[1]};
+      char g[2] = {val[2], val[2]};
+      char b[2] = {val[3], val[3]};
+      unsigned long rv = strtoul(r, NULL, 16);
+      unsigned long gv = strtoul(g, NULL, 16);
+      unsigned long bv = strtoul(b, NULL, 16);
+      *rgb = (rv << 16) | (gv << 8) | bv;
+      return true;
+    } else if (len == 7) { // #RRGGBB
+      char hex[7];
+      memcpy(hex, val + 1, 6);
+      hex[6] = '\0';
+      char *end;
+      *rgb = strtoul(hex, &end, 16);
+      return end == hex + 6;
+    } else if (len == 10) { // #RRRGGGBBB
+      char r[3], g[3], b[3];
+      memcpy(r, val + 1, 3);
+      memcpy(g, val + 4, 3);
+      memcpy(b, val + 7, 3);
+      *rgb = ((strtoul(r, NULL, 16) >> 4) << 16) |
+             ((strtoul(g, NULL, 16) >> 4) << 8) | (strtoul(b, NULL, 16) >> 4);
+      return true;
+    } else if (len == 13) { // #RRRRGGGGBBBB
+      char r[3], g[3], b[3];
+      memcpy(r, val + 1, 2);
+      memcpy(g, val + 5, 2);
+      memcpy(b, val + 9, 2);
+      *rgb = (strtoul(r, NULL, 16) << 16) | (strtoul(g, NULL, 16) << 8) |
+             strtoul(b, NULL, 16);
+      return true;
+    }
+  } else if (len >= 7 && strncmp(val, "rgb:", 4) == 0) {
+    // rgb:R/G/B, rgb:RR/GG/BB, rgb:RRR/GGG/BBB, rgb:RRRR/GGGG/BBBB
+    char r_str[8], g_str[8], b_str[8];
+    const char *p = val + 4;
+    const char *slash1 = NULL;
+    for (int k = 0; k < len - 4; k++) {
+      if (p[k] == '/') {
+        slash1 = p + k;
+        break;
+      }
+    }
+    if (!slash1)
+      return false;
+    int r_len = slash1 - p;
+    if (r_len < 1 || r_len > 4)
+      return false;
+    memcpy(r_str, p, r_len);
+    r_str[r_len] = '\0';
+
+    p = slash1 + 1;
+    const char *slash2 = NULL;
+    int rem = len - (p - val);
+    for (int k = 0; k < rem; k++) {
+      if (p[k] == '/') {
+        slash2 = p + k;
+        break;
+      }
+    }
+    if (!slash2)
+      return false;
+    int g_len = slash2 - p;
+    if (g_len < 1 || g_len > 4)
+      return false;
+    memcpy(g_str, p, g_len);
+    g_str[g_len] = '\0';
+
+    p = slash2 + 1;
+    int b_len = len - (p - val);
+    if (b_len < 1 || b_len > 4)
+      return false;
+    memcpy(b_str, p, b_len);
+    b_str[b_len] = '\0';
+
+    unsigned long r = strtoul(r_str, NULL, 16);
+    unsigned long g = strtoul(g_str, NULL, 16);
+    unsigned long b = strtoul(b_str, NULL, 16);
+
+    if (r_len == 1) r = (r << 4) | r; else if (r_len > 2) r >>= (r_len - 2) * 4;
+    if (g_len == 1) g = (g << 4) | g; else if (g_len > 2) g >>= (g_len - 2) * 4;
+    if (b_len == 1) b = (b << 4) | b; else if (b_len > 2) b >>= (b_len - 2) * 4;
+
+    *rgb = (r << 16) | (g << 8) | b;
+    return true;
+  }
+
+  return false;
+}
+
 static void handle_osc(Terminal *terminal, Term_Token token) {
   int i = 2;
   int cmd = 0;
@@ -434,7 +530,8 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
     int text_end = token.length - 1;
     if (text_end > text_start && (unsigned char)token.value[text_end] == 0x07)
       text_end--;
-    else if (text_end > text_start && token.value[text_end] == '\\' && token.value[text_end-1] == '\x1b')
+    else if (text_end > text_start && token.value[text_end] == '\\' &&
+             token.value[text_end - 1] == '\x1b')
       text_end -= 2;
     int tlen = text_end - text_start + 1;
     if (tlen < 0)
@@ -453,35 +550,41 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
       memcpy(terminal->icon_name, &token.value[text_start], tlen);
       terminal->icon_name[tlen] = '\0';
     }
-  } else if (cmd == 10) {
+  } else if (cmd == 10 || cmd == 11) {
     const char *val = &token.value[i];
-    int remaining = token.length - i;
-    if (remaining >= 1 && val[0] == '?') {
-      unsigned long fg = terminal->default_fg_rgb;
-      unsigned int r = (fg >> 16) & 0xff;
-      unsigned int g = (fg >> 8) & 0xff;
-      unsigned int b = fg & 0xff;
+    int text_start = i;
+    int text_end = token.length - 1;
+    if (text_end > text_start && (unsigned char)token.value[text_end] == 0x07)
+      text_end--;
+    else if (text_end > text_start && token.value[text_end] == '\\' &&
+             token.value[text_end - 1] == '\x1b')
+      text_end -= 2;
+    int tlen = text_end - text_start + 1;
+
+    if (tlen >= 1 && val[0] == '?') {
+      unsigned long rgb = (cmd == 10) ? terminal->osc_fg : terminal->osc_bg;
+      unsigned int r = (rgb >> 16) & 0xff;
+      unsigned int g = (rgb >> 8) & 0xff;
+      unsigned int b = rgb & 0xff;
       char buf[64];
       int len = snprintf(buf, sizeof(buf),
-                         "\x1b]10;rgb:%02x%02x/%02x%02x/%02x%02x\x07",
-                         r, r, g, g, b, b);
+                         "\x1b]%d;rgb:%02x%02x/%02x%02x/%02x%02x\x07", cmd, r,
+                         r, g, g, b, b);
       terminal_respond(terminal, buf, len);
-    }
-  } else if (cmd == 11) {
-    const char *val = &token.value[i];
-    int remaining = token.length - i;
-    if (remaining >= 7 && val[0] == '#') {
-      char hex[7];
-      memcpy(hex, val + 1, 6);
-      hex[6] = '\0';
-      char *end;
-      unsigned long rgb = strtoul(hex, &end, 16);
-      if (end == hex + 6) {
-        terminal->osc_bg = rgb;
-        terminal->bg_dirty = true;
+    } else {
+      unsigned long rgb;
+      if (parse_color(val, tlen, &rgb)) {
+        if (cmd == 10) {
+          terminal->osc_fg = rgb;
+          terminal->fg_dirty = true;
+        } else {
+          terminal->osc_bg = rgb;
+          terminal->bg_dirty = true;
+        }
       }
     }
   } else if (cmd == 7 || cmd == 133) {
+
     // OSC 7: current working directory notification
     // OSC 133: shell integration (FinalTerm semantic zones)
   } else {
@@ -549,6 +652,8 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->bracketed_paste = false;
   terminal->mouse_mode = 0;
   terminal->mouse_sgr = false;
+  terminal->osc_fg = 0xffffff;
+  terminal->fg_dirty = false;
   terminal->osc_bg = 0;
   terminal->bg_dirty = false;
   terminal->default_fg_rgb = 0xffffff;
@@ -571,6 +676,10 @@ void reset_terminal(Terminal *terminal) {
   terminal->bracketed_paste = false;
   terminal->mouse_mode = 0;
   terminal->mouse_sgr = false;
+  terminal->osc_fg = 0xffffff;
+  terminal->fg_dirty = false;
+  terminal->osc_bg = 0;
+  terminal->bg_dirty = false;
   terminal->response_len = 0;
   terminal->window_title_stack_depth = 0;
   terminal->icon_name_stack_depth = 0;
