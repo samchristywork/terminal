@@ -7,6 +7,9 @@
 #include "terminal.h"
 #include "tokenize.h"
 
+static void handle_erase(Term_Screen *screen, Term_TokenType type,
+                         int width, int height);
+
 static void terminal_respond(Terminal *t, const char *data, int len) {
   int available = (int)sizeof(t->response_buf) - t->response_len;
   if (len > available)
@@ -312,6 +315,26 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
     int cols = (n < width - cursor->x) ? n : width - cursor->x;
     for (int k = cursor->x; k < cursor->x + cols; k++)
       memset(&screen->lines[cursor->y].cells[k], 0, sizeof(Term_Cell));
+  } else if (final == 'J') {
+    int nj = csi_param(token, 0);
+    if (nj == 0) {
+      handle_erase(screen, TOKEN_ERASE_DOWN, width, height);
+    } else if (nj == 1) {
+      handle_erase(screen, TOKEN_ERASE_UP, width, height);
+    } else if (nj == 2) {
+      handle_erase(screen, TOKEN_ERASE_ALL, width, height);
+    } else if (nj == 3) {
+      handle_erase(screen, TOKEN_ERASE_SCROLLBACK, width, height);
+    }
+  } else if (final == 'K') {
+    int nk = csi_param(token, 0);
+    if (nk == 0) {
+      handle_erase(screen, TOKEN_ERASE_EOL, width, height);
+    } else if (nk == 1) {
+      handle_erase(screen, TOKEN_ERASE_SOL, width, height);
+    } else if (nk == 2) {
+      handle_erase(screen, TOKEN_ERASE_LINE, width, height);
+    }
   } else if (final == 'h' || final == 'l') {
     bool enable = (final == 'h');
     if (starts_with(token.value, token.length, "\x1b[?1000"))
@@ -322,7 +345,14 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
       terminal->mouse_mode = enable ? 3 : 0;
     else if (starts_with(token.value, token.length, "\x1b[?1006"))
       terminal->mouse_sgr = enable;
-  } else if (final == 't') {
+    else if (starts_with(token.value, token.length, "\x1b[?1049"))
+      terminal->using_alt_screen = enable;
+    else if (starts_with(token.value, token.length, "\x1b[?25"))
+      screen->cursor_hidden = !enable;
+    else if (starts_with(token.value, token.length, "\x1b[?2004"))
+      terminal->bracketed_paste = enable;
+  }
+ else if (final == 't') {
     const char *p = token.value + 2;
     const char *end = token.value + token.length - 1;
     int n1 = 0, n2 = 0;
@@ -671,40 +701,13 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       break;
     }
     case TOKEN_NEWLINE:
-      handle_newline(screen, width, height);
+      handle_newline(active, width, height);
       break;
     case TOKEN_CARRIAGE_RETURN:
       cursor->x = 0;
       break;
     case TOKEN_CSI_CODE:
-      handle_csi(terminal, screen, token);
-      break;
-    case TOKEN_ERASE_EOL:
-    case TOKEN_ERASE_SOL:
-    case TOKEN_ERASE_LINE:
-    case TOKEN_ERASE_DOWN:
-    case TOKEN_ERASE_UP:
-    case TOKEN_ERASE_ALL:
-    case TOKEN_ERASE_SCROLLBACK:
-      handle_erase(screen, token.type, width, height);
-      break;
-    case TOKEN_ALT_SCREEN:
-      terminal->using_alt_screen = true;
-      break;
-    case TOKEN_MAIN_SCREEN:
-      terminal->using_alt_screen = false;
-      break;
-    case TOKEN_CURSOR_HIDE:
-      screen->cursor_hidden = true;
-      break;
-    case TOKEN_CURSOR_SHOW:
-      screen->cursor_hidden = false;
-      break;
-    case TOKEN_BRACKETED_PASTE_ON:
-      terminal->bracketed_paste = true;
-      break;
-    case TOKEN_BRACKETED_PASTE_OFF:
-      terminal->bracketed_paste = false;
+      handle_csi(terminal, active, token);
       break;
     case TOKEN_FULL_RESET:
       reset_terminal(terminal);
@@ -712,7 +715,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     case TOKEN_TAB: {
       int next_tab_stop = ((cursor->x / 8) + 1) * 8;
       if (next_tab_stop >= width)
-        handle_newline(screen, width, height);
+        handle_newline(active, width, height);
       else
         cursor->x = next_tab_stop;
       break;
