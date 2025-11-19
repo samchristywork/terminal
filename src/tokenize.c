@@ -108,7 +108,11 @@ Term_Tokens *tokenize(const char *text, int length) {
 
   for (int i = 0; i < length; i++) {
     int len = 0;
-    if (matches(text, length, i, "\n", &len)) {
+    if (is_osc_sequence(text, length, i, &len)) {
+      add_token(tokens, TOKEN_OSC, text, i, len);
+    } else if (is_csi_code(text, length, i, &len)) {
+      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+    } else if (matches(text, length, i, "\n", &len)) {
       add_token(tokens, TOKEN_NEWLINE, text, i, len);
     } else if (matches(text, length, i, "\r", &len)) {
       add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);

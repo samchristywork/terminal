@@ -333,19 +333,38 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
       while (p < end && *p >= '0' && *p <= '9')
         n2 = n2 * 10 + (*p++ - '0');
     }
-    (void)n2;
     if (n1 == 22) {
-      if (terminal->title_stack_depth < 8) {
-        memcpy(terminal->title_stack[terminal->title_stack_depth],
-               terminal->window_title, 256);
-        terminal->title_stack_depth++;
+      if (n2 == 0 || n2 == 2) {
+        if (terminal->window_title_stack_depth < 32) {
+          memcpy(terminal->window_title_stack[terminal->window_title_stack_depth],
+                 terminal->window_title, 256);
+          terminal->window_title_stack_depth++;
+        }
+      }
+      if (n2 == 0 || n2 == 1) {
+        if (terminal->icon_name_stack_depth < 32) {
+          memcpy(terminal->icon_name_stack[terminal->icon_name_stack_depth],
+                 terminal->icon_name, 256);
+          terminal->icon_name_stack_depth++;
+        }
       }
     } else if (n1 == 23) {
-      if (terminal->title_stack_depth > 0) {
-        terminal->title_stack_depth--;
-        memcpy(terminal->window_title,
-               terminal->title_stack[terminal->title_stack_depth], 256);
-        terminal->title_dirty = true;
+      if (n2 == 0 || n2 == 2) {
+        if (terminal->window_title_stack_depth > 0) {
+          terminal->window_title_stack_depth--;
+          memcpy(terminal->window_title,
+                 terminal->window_title_stack[terminal->window_title_stack_depth],
+                 256);
+          terminal->title_dirty = true;
+        }
+      }
+      if (n2 == 0 || n2 == 1) {
+        if (terminal->icon_name_stack_depth > 0) {
+          terminal->icon_name_stack_depth--;
+          memcpy(terminal->icon_name,
+                 terminal->icon_name_stack[terminal->icon_name_stack_depth], 256);
+          terminal->title_dirty = true;
+        }
       }
     }
   } else if (final == 'n') {
@@ -380,18 +399,30 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
     i++;
 
   if (cmd == 0 || cmd == 1 || cmd == 2) {
+    LOG_DEBUG_MSG("OSC title/icon cmd %d, token len %d", cmd, token.length);
     int text_start = i;
     int text_end = token.length - 1;
-    if (text_end > text_start && token.value[text_end] == '\\')
+    if (text_end > text_start && (unsigned char)token.value[text_end] == 0x07)
       text_end--;
-    int tlen = text_end - text_start;
+    else if (text_end > text_start && token.value[text_end] == '\\' && token.value[text_end-1] == '\x1b')
+      text_end -= 2;
+    int tlen = text_end - text_start + 1;
     if (tlen < 0)
       tlen = 0;
-    if (tlen >= (int)sizeof(terminal->window_title))
-      tlen = sizeof(terminal->window_title) - 1;
-    memcpy(terminal->window_title, &token.value[text_start], tlen);
-    terminal->window_title[tlen] = '\0';
-    terminal->title_dirty = true;
+
+    if (cmd == 0 || cmd == 2) {
+      if (tlen >= (int)sizeof(terminal->window_title))
+        tlen = sizeof(terminal->window_title) - 1;
+      memcpy(terminal->window_title, &token.value[text_start], tlen);
+      terminal->window_title[tlen] = '\0';
+      terminal->title_dirty = true;
+    }
+    if (cmd == 0 || cmd == 1) {
+      if (tlen >= (int)sizeof(terminal->icon_name))
+        tlen = sizeof(terminal->icon_name) - 1;
+      memcpy(terminal->icon_name, &token.value[text_start], tlen);
+      terminal->icon_name[tlen] = '\0';
+    }
   } else if (cmd == 10) {
     const char *val = &token.value[i];
     int remaining = token.length - i;
@@ -482,6 +513,7 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->height = height;
   terminal->using_alt_screen = false;
   terminal->window_title[0] = '\0';
+  terminal->icon_name[0] = '\0';
   terminal->title_dirty = false;
   terminal->partial_len = 0;
   terminal->bracketed_paste = false;
@@ -492,7 +524,8 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->default_fg_rgb = 0xffffff;
   terminal->cursor_shape = 0;
   terminal->response_len = 0;
-  terminal->title_stack_depth = 0;
+  terminal->window_title_stack_depth = 0;
+  terminal->icon_name_stack_depth = 0;
   init_screen(&terminal->screen, width, height, scrollback_lines);
   init_screen(&terminal->alt_screen, width, height, scrollback_lines);
 }
@@ -502,13 +535,15 @@ void reset_terminal(Terminal *terminal) {
   reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
   terminal->using_alt_screen = false;
   terminal->window_title[0] = '\0';
+  terminal->icon_name[0] = '\0';
   terminal->title_dirty = false;
   terminal->partial_len = 0;
   terminal->bracketed_paste = false;
   terminal->mouse_mode = 0;
   terminal->mouse_sgr = false;
   terminal->response_len = 0;
-  terminal->title_stack_depth = 0;
+  terminal->window_title_stack_depth = 0;
+  terminal->icon_name_stack_depth = 0;
 }
 
 void resize_terminal(Terminal *terminal, int new_width, int new_height) {

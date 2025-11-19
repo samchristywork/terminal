@@ -74,6 +74,7 @@ typedef struct {
   Term_Screen alt_screen;
   bool using_alt_screen;
   char window_title[256];
+  char icon_name[256];
   bool title_dirty;
   char partial_buf[64];
   int partial_len;
@@ -86,8 +87,10 @@ typedef struct {
   int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking underline, 4=steady underline, 5=blinking bar, 6=steady bar
   char response_buf[256];
   int response_len;
-  char title_stack[8][256];
-  int title_stack_depth;
+  char window_title_stack[32][256];
+  int window_title_stack_depth;
+  char icon_name_stack[32][256];
+  int icon_name_stack_depth;
 } Terminal;
 
 typedef enum {
