@@ -65,6 +65,7 @@ typedef struct {
   int scroll_top;
   int scroll_bot;
   bool cursor_hidden;
+  bool scrolled;
 } Term_Screen;
 
 typedef struct {

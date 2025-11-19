@@ -21,6 +21,7 @@ void init_screen(Term_Screen *screen, int width, int height, int scrollback_line
   screen->scroll_offset = 0;
   screen->scroll_top = 0;
   screen->scroll_bot = height - 1;
+  screen->scrolled = false;
 }
 
 void free_screen(Term_Screen *screen, int height) {
@@ -51,6 +52,7 @@ void reset_screen(Term_Screen *screen, int width, int height) {
   screen->scroll_top = 0;
   screen->scroll_bot = height - 1;
   screen->cursor_hidden = false;
+  screen->scrolled = false;
 }
 
 void scroll_screen(Term_Screen *screen, int width, int height) {
@@ -82,6 +84,7 @@ void scroll_screen(Term_Screen *screen, int width, int height) {
   for (int k = 0; k < width; k++) {
     memset(&screen->lines[bot].cells[k], 0, sizeof(Term_Cell));
   }
+  screen->scrolled = true;
 }
 
 void handle_newline(Term_Screen *screen, int width, int height) {

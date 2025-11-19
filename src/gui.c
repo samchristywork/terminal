@@ -382,6 +382,11 @@ int main(int argc, char *argv[]) {
 
     if (FD_ISSET(gui.pipe_fd, &read_fds)) {
       read_shell_output(&gui, &terminal);
+      if (terminal.screen.scrolled || terminal.alt_screen.scrolled) {
+        gui.has_selection = false;
+        terminal.screen.scrolled = false;
+        terminal.alt_screen.scrolled = false;
+      }
       if (terminal.response_len > 0) {
         write(gui.pipe_fd, terminal.response_buf, terminal.response_len);
         terminal.response_len = 0;
