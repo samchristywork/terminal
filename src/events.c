@@ -226,9 +226,6 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
 
 static void on_button_release(GuiContext *gui, Terminal *terminal,
                               XButtonEvent *ev) {
-  if (ev->button != Button1)
-    return;
-
   bool shift = (ev->state & ShiftMask) != 0;
 
   if (terminal->mouse_mode >= 1 && !shift) {
@@ -238,12 +235,24 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
     if (cell_x >= terminal->width) cell_x = terminal->width - 1;
     if (cell_y < 0) cell_y = 0;
     if (cell_y >= terminal->height) cell_y = terminal->height - 1;
-    int btn = 0;
-    if (ev->state & Mod1Mask) btn |= 8;
-    if (ev->state & ControlMask) btn |= 16;
-    send_mouse_event(gui, terminal, btn, cell_x, cell_y, true);
-    return;
+
+    int btn = -1;
+    switch (ev->button) {
+    case Button1: btn = 0; break;
+    case Button2: btn = 1; break;
+    case Button3: btn = 2; break;
+    }
+
+    if (btn >= 0) {
+      if (ev->state & Mod1Mask) btn |= 8;
+      if (ev->state & ControlMask) btn |= 16;
+      send_mouse_event(gui, terminal, btn, cell_x, cell_y, true);
+      return;
+    }
   }
+
+  if (ev->button != Button1)
+    return;
 
   if (gui->selecting) {
     Term_Screen *scr =
@@ -285,7 +294,12 @@ static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
     bool should_report =
         (terminal->mouse_mode >= 3) || (terminal->mouse_mode >= 2 && any_btn);
     if (should_report) {
-      int btn = btn2 ? 33 : btn3 ? 34 : 32;
+      int btn;
+      if (btn1) btn = 32;
+      else if (btn2) btn = 33;
+      else if (btn3) btn = 34;
+      else btn = 35;
+
       if (ev->state & Mod1Mask) btn |= 8;
       if (ev->state & ControlMask) btn |= 16;
       send_mouse_event(gui, terminal, btn, cell_x, cell_y, false);
