@@ -169,6 +169,57 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
   }
 }
 
+static Term_Cell *cell_at(Term_Screen *scr, Terminal *terminal,
+                          int abs_row, int col) {
+  if (abs_row < 0 || col < 0)
+    return NULL;
+  if (abs_row < scr->scrollback.count) {
+    int sb_idx = (scr->scrollback.head + abs_row) % scr->scrollback.capacity;
+    if (col >= scr->scrollback.widths[sb_idx])
+      return NULL;
+    return &scr->scrollback.lines[sb_idx][col];
+  }
+  int row = abs_row - scr->scrollback.count;
+  if (row >= terminal->height || col >= terminal->width)
+    return NULL;
+  return &scr->lines[row].cells[col];
+}
+
+static bool is_word_char(Term_Cell *cell) {
+  if (!cell || cell->length == 0)
+    return false;
+  unsigned char c = (unsigned char)cell->data[0];
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+         (c >= '0' && c <= '9') || c == '_' || c > 127;
+}
+
+static void select_word(GuiContext *gui, Terminal *terminal,
+                        Term_Screen *scr, int abs_row, int col) {
+  int row_width = (abs_row < scr->scrollback.count)
+      ? scr->scrollback.widths[(scr->scrollback.head + abs_row) %
+                               scr->scrollback.capacity]
+      : terminal->width;
+
+  int start = col;
+  int end = col;
+
+  if (is_word_char(cell_at(scr, terminal, abs_row, col))) {
+    while (start > 0 &&
+           is_word_char(cell_at(scr, terminal, abs_row, start - 1)))
+      start--;
+    while (end < row_width - 1 &&
+           is_word_char(cell_at(scr, terminal, abs_row, end + 1)))
+      end++;
+  }
+
+  gui->sel_anchor_x = start;
+  gui->sel_anchor_y = abs_row;
+  gui->sel_cur_x = end;
+  gui->sel_cur_y = abs_row;
+  gui->has_selection = true;
+  gui->selecting = false;
+}
+
 static void on_button_press(GuiContext *gui, Terminal *terminal,
                             XButtonEvent *ev) {
   Term_Screen *scr =
@@ -200,13 +251,32 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
   }
 
   if (ev->button == Button1) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long elapsed_ms = (now.tv_sec - gui->last_click_time.tv_sec) * 1000 +
+                      (now.tv_nsec - gui->last_click_time.tv_nsec) / 1000000;
     int anchor_row = scr->scrollback.count - scr->scroll_offset + cell_y;
-    gui->selecting = true;
-    gui->has_selection = false;
-    gui->sel_anchor_x = cell_x;
-    gui->sel_anchor_y = anchor_row;
-    gui->sel_cur_x = cell_x;
-    gui->sel_cur_y = anchor_row;
+
+    if (elapsed_ms < 300 && cell_x == gui->last_click_x &&
+        anchor_row == gui->last_click_y) {
+      select_word(gui, terminal, scr, anchor_row, cell_x);
+      if (gui->has_selection) {
+        build_selection_text(gui, terminal);
+        XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+      }
+      gui->last_click_time.tv_sec = 0;
+      gui->last_click_time.tv_nsec = 0;
+    } else {
+      gui->last_click_time = now;
+      gui->last_click_x = cell_x;
+      gui->last_click_y = anchor_row;
+      gui->selecting = true;
+      gui->has_selection = false;
+      gui->sel_anchor_x = cell_x;
+      gui->sel_anchor_y = anchor_row;
+      gui->sel_cur_x = cell_x;
+      gui->sel_cur_y = anchor_row;
+    }
     draw_terminal(gui, terminal);
   } else if (ev->button == Button2) {
     XConvertSelection(gui->display, XA_PRIMARY, gui->atom_utf8_string,
