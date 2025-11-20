@@ -60,6 +60,7 @@ int init_gui(GuiContext *gui, Args *args) {
   char font_pattern[1024];
   char regular_base[256] = "";
   char bold_base[256] = "";
+  char italic_base[256] = "";
   char exe_path[512];
   char exe_dir[512];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
@@ -157,11 +158,22 @@ int init_gui(GuiContext *gui, Args *args) {
     if (!gui->font_bold)
       gui->font_bold = gui->font;
   }
+  if (regular_base[0]) {
+    snprintf(font_pattern, sizeof(font_pattern), "%s:slant=italic:size=%d",
+             regular_base, font_size);
+    gui->font_italic = XftFontOpenName(gui->display, gui->screen, font_pattern);
+    if (gui->font_italic)
+      snprintf(italic_base, sizeof(italic_base), "%s:slant=italic", regular_base);
+  }
+  if (!gui->font_italic)
+    gui->font_italic = gui->font;
+
   LOG_INFO_MSG("Loaded font: %s", font_pattern);
 
   gui->font_size = font_size;
   snprintf(gui->font_base, sizeof(gui->font_base), "%s", regular_base);
   snprintf(gui->font_bold_base, sizeof(gui->font_bold_base), "%s", bold_base);
+  snprintf(gui->font_italic_base, sizeof(gui->font_italic_base), "%s", italic_base);
 
   gui->char_width = gui->font->max_advance_width;
   if (gui->font_bold && gui->font_bold != gui->font &&
@@ -199,9 +211,13 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
     return;
 
   bool bold_separate = (gui->font_bold != gui->font);
+  bool italic_separate = (gui->font_italic != gui->font &&
+                          gui->font_italic != gui->font_bold);
   XftFontClose(gui->display, gui->font);
   if (bold_separate)
     XftFontClose(gui->display, gui->font_bold);
+  if (italic_separate)
+    XftFontClose(gui->display, gui->font_italic);
 
   char pattern[512];
   snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_base, new_size);
@@ -221,6 +237,15 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
     } else {
       gui->font_bold = gui->font;
     }
+    if (gui->font_italic_base[0]) {
+      snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_italic_base,
+               gui->font_size);
+      gui->font_italic = XftFontOpenName(gui->display, gui->screen, pattern);
+      if (!gui->font_italic)
+        gui->font_italic = gui->font;
+    } else {
+      gui->font_italic = gui->font;
+    }
     return;
   }
 
@@ -232,6 +257,16 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
       gui->font_bold = gui->font;
   } else {
     gui->font_bold = gui->font;
+  }
+
+  if (gui->font_italic_base[0]) {
+    snprintf(pattern, sizeof(pattern), "%s:size=%d", gui->font_italic_base,
+             new_size);
+    gui->font_italic = XftFontOpenName(gui->display, gui->screen, pattern);
+    if (!gui->font_italic)
+      gui->font_italic = gui->font;
+  } else {
+    gui->font_italic = gui->font;
   }
 
   gui->font_size = new_size;
@@ -299,9 +334,10 @@ void cleanup_gui(GuiContext *gui) {
 
   XftDrawDestroy(gui->xft_draw);
   XftFontClose(gui->display, gui->font);
-  if (gui->font_bold != gui->font) {
+  if (gui->font_bold != gui->font)
     XftFontClose(gui->display, gui->font_bold);
-  }
+  if (gui->font_italic != gui->font && gui->font_italic != gui->font_bold)
+    XftFontClose(gui->display, gui->font_italic);
   XFreePixmap(gui->display, gui->backbuffer);
   XFreeGC(gui->display, gui->gc);
   XDestroyWindow(gui->display, gui->window);

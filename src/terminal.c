@@ -26,12 +26,15 @@ static void handle_field(Term_Cursor **cursor, int value) {
     (*cursor)->attr.bg.type = COLOR_DEFAULT;
     (*cursor)->attr.bold = 0;
     (*cursor)->attr.dim = 0;
+    (*cursor)->attr.italic = 0;
     (*cursor)->attr.underline = 0;
     (*cursor)->attr.reverse = 0;
   } else if (value == 1) {
     (*cursor)->attr.bold = 1;
   } else if (value == 2) {
     (*cursor)->attr.dim = 1;
+  } else if (value == 3) {
+    (*cursor)->attr.italic = 1;
   } else if (value == 4) {
     (*cursor)->attr.underline = 1;
   } else if (value == 7) {
@@ -51,6 +54,8 @@ static void handle_field(Term_Cursor **cursor, int value) {
   } else if (value == 22) {
     (*cursor)->attr.bold = 0;
     (*cursor)->attr.dim = 0;
+  } else if (value == 23) {
+    (*cursor)->attr.italic = 0;
   } else if (value == 24) {
     (*cursor)->attr.underline = 0;
   } else if (value == 27) {

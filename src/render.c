@@ -358,7 +358,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       if (cell.length > 0) {
         XftColor *fg_color;
-        XftFont *font_to_use = cell.attr.bold ? gui->font_bold : gui->font;
+        XftFont *font_to_use = cell.attr.bold   ? gui->font_bold
+                             : cell.attr.italic ? gui->font_italic
+                                                : gui->font;
 
         if (reverse) {
           fg_color =
