@@ -189,6 +189,11 @@ XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
     }
     int slot = gui->rgb_cache_next;
     gui->rgb_cache_next = (gui->rgb_cache_next + 1) % 64;
+    if (gui->rgb_cache_valid[slot]) {
+      XftColorFree(gui->display, DefaultVisual(gui->display, gui->screen),
+                   DefaultColormap(gui->display, gui->screen),
+                   &gui->rgb_cache[slot]);
+    }
     XRenderColor xrender_color;
     xrender_color.red = (unsigned short)(color.rgb.red << 8);
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
