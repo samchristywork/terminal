@@ -55,6 +55,9 @@ typedef struct {
   int font_size;
   char font_base[256];
   char font_bold_base[256];
+  struct timespec last_click_time;
+  int last_click_x;
+  int last_click_y;
 } GuiContext;
 
 int init_gui(GuiContext *gui, Args *args);

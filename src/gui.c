@@ -180,6 +180,10 @@ int init_gui(GuiContext *gui, Args *args) {
 
   gui->cursor_visible = true;
   clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
+  gui->last_click_time.tv_sec = 0;
+  gui->last_click_time.tv_nsec = 0;
+  gui->last_click_x = -1;
+  gui->last_click_y = -1;
 
   memset(gui->xft_color_cached, 0, sizeof(gui->xft_color_cached));
   memset(gui->rgb_cache_valid, 0, sizeof(gui->rgb_cache_valid));
