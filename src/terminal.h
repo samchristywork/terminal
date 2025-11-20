@@ -28,6 +28,7 @@ typedef struct {
   Term_Color fg;
   Term_Color bg;
   int bold;
+  int dim;
   int underline;
   int reverse;
 } Term_Attr;

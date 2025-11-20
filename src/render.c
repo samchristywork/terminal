@@ -372,6 +372,15 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
                   : &gui->xft_default_fg;
         }
 
+        XftColor dim_color;
+        if (cell.attr.dim && !reverse) {
+          dim_color = *fg_color;
+          dim_color.color.red   >>= 1;
+          dim_color.color.green >>= 1;
+          dim_color.color.blue  >>= 1;
+          fg_color = &dim_color;
+        }
+
         XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
                           pixel_y + gui->char_ascent, (FcChar8 *)cell.data,
                           cell.length);
