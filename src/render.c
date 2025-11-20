@@ -316,8 +316,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         cell = term_screen->lines[combined - sb->count].cells[x];
       }
 
-      int pixel_x = x * gui->char_width + 10;
-      int pixel_y = y * (gui->char_height) + 10;
+      int pixel_x = x * gui->char_width + gui->margin;
+      int pixel_y = y * (gui->char_height) + gui->margin;
 
       unsigned long bg_color = gui->default_bg;
       if (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) {

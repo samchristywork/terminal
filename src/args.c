@@ -21,6 +21,7 @@ void print_usage(const char *program_name) {
                   "with hex value\n");
   fprintf(stderr,
           "  --log-file FILE       Write logs to FILE instead of stdout\n");
+  fprintf(stderr, "  --margin N            Set window margin in pixels (default: 10)\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
 
@@ -31,6 +32,7 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->font = NULL;
   args->fg = -1;
   args->bg = -1;
+  args->margin = 10;
   for (int i = 0; i < 16; i++)
     args->palette[i] = -1;
 
@@ -97,6 +99,17 @@ void parse_args(int argc, char *argv[], Args *args) {
         exit(1);
       }
       args->log_file = argv[++i];
+    } else if (strcmp(argv[i], "--margin") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --margin requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      args->margin = atoi(argv[++i]);
+      if (args->margin < 0) {
+        fprintf(stderr, "Error: margin must be non-negative\n");
+        exit(1);
+      }
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage(argv[0]);
       exit(0);

@@ -188,6 +188,7 @@ int init_gui(GuiContext *gui, Args *args) {
   memset(gui->xft_color_cached, 0, sizeof(gui->xft_color_cached));
   memset(gui->rgb_cache_valid, 0, sizeof(gui->rgb_cache_valid));
   gui->rgb_cache_next = 0;
+  gui->margin = args->margin;
 
   return 0;
 }
@@ -241,8 +242,8 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
   gui->char_height = gui->font->ascent + gui->font->descent;
   gui->char_ascent = gui->font->ascent;
 
-  int term_cols = (gui->window_width - 20) / gui->char_width;
-  int term_rows = (gui->window_height - 20) / gui->char_height;
+  int term_cols = (gui->window_width - 2 * gui->margin) / gui->char_width;
+  int term_rows = (gui->window_height - 2 * gui->margin) / gui->char_height;
   if (term_cols < 1)
     term_cols = 1;
   if (term_rows < 1)
@@ -329,8 +330,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  int term_cols = (gui.window_width - 20) / gui.char_width;
-  int term_rows = (gui.window_height - 20) / (gui.char_height);
+  int term_cols = (gui.window_width - 2 * gui.margin) / gui.char_width;
+  int term_rows = (gui.window_height - 2 * gui.margin) / (gui.char_height);
   if (term_cols < 1)
     term_cols = 1;
   if (term_rows < 1)

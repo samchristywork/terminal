@@ -54,8 +54,8 @@ static void on_configure(GuiContext *gui, Terminal *terminal,
                                 DefaultVisual(gui->display, gui->screen),
                                 DefaultColormap(gui->display, gui->screen));
 
-  int term_cols = (new_width - 20) / gui->char_width;
-  int term_rows = (new_height - 20) / gui->char_height;
+  int term_cols = (new_width - 2 * gui->margin) / gui->char_width;
+  int term_rows = (new_height - 2 * gui->margin) / gui->char_height;
   if (term_cols < 1)
     term_cols = 1;
   if (term_rows < 1)
@@ -225,8 +225,8 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
   Term_Screen *scr =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   int max_scroll = scr->scrollback.count;
-  int cell_x = (ev->x - 10) / gui->char_width;
-  int cell_y = (ev->y - 10) / gui->char_height;
+  int cell_x = (ev->x - gui->margin) / gui->char_width;
+  int cell_y = (ev->y - gui->margin) / gui->char_height;
   if (cell_x < 0) cell_x = 0;
   if (cell_x >= terminal->width) cell_x = terminal->width - 1;
   if (cell_y < 0) cell_y = 0;
@@ -299,8 +299,8 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
   bool shift = (ev->state & ShiftMask) != 0;
 
   if (terminal->mouse_mode >= 1 && !shift) {
-    int cell_x = (ev->x - 10) / gui->char_width;
-    int cell_y = (ev->y - 10) / gui->char_height;
+    int cell_x = (ev->x - gui->margin) / gui->char_width;
+    int cell_y = (ev->y - gui->margin) / gui->char_height;
     if (cell_x < 0) cell_x = 0;
     if (cell_x >= terminal->width) cell_x = terminal->width - 1;
     if (cell_y < 0) cell_y = 0;
@@ -327,8 +327,8 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
   if (gui->selecting) {
     Term_Screen *scr =
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
-    int cell_x = (ev->x - 10) / gui->char_width;
-    int cell_y = (ev->y - 10) / gui->char_height;
+    int cell_x = (ev->x - gui->margin) / gui->char_width;
+    int cell_y = (ev->y - gui->margin) / gui->char_height;
     if (cell_x < 0) cell_x = 0;
     if (cell_x >= terminal->width) cell_x = terminal->width - 1;
     if (cell_y < 0) cell_y = 0;
@@ -348,8 +348,8 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
 }
 
 static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
-  int cell_x = (ev->x - 10) / gui->char_width;
-  int cell_y = (ev->y - 10) / gui->char_height;
+  int cell_x = (ev->x - gui->margin) / gui->char_width;
+  int cell_y = (ev->y - gui->margin) / gui->char_height;
   if (cell_x < 0) cell_x = 0;
   if (cell_x >= terminal->width) cell_x = terminal->width - 1;
   if (cell_y < 0) cell_y = 0;

@@ -58,6 +58,7 @@ typedef struct {
   struct timespec last_click_time;
   int last_click_x;
   int last_click_y;
+  int margin;
 } GuiContext;
 
 int init_gui(GuiContext *gui, Args *args);
