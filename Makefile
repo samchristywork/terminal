@@ -4,6 +4,7 @@ LIBS = -lX11 -lXft -lXrender -lfontconfig -lutil
 OBJS = build/gui.o build/render.o build/events.o build/shell.o \
        build/terminal.o build/tokenize.o build/screen.o \
        build/args.o build/log.o
+DEPS = $(OBJS:.o=.d)
 
 all: gui
 
@@ -14,7 +15,9 @@ build/gui: $(OBJS)
 
 build/%.o: src/%.c
 	mkdir -p build
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
 
 clean:
 	rm -rf build
