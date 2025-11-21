@@ -30,6 +30,7 @@ typedef struct {
   int bold;
   int dim;
   int italic;
+  int blink;
   int underline;
   int reverse;
 } Term_Attr;

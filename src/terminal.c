@@ -27,6 +27,7 @@ static void handle_field(Term_Cursor **cursor, int value) {
     (*cursor)->attr.bold = 0;
     (*cursor)->attr.dim = 0;
     (*cursor)->attr.italic = 0;
+    (*cursor)->attr.blink = 0;
     (*cursor)->attr.underline = 0;
     (*cursor)->attr.reverse = 0;
   } else if (value == 1) {
@@ -37,6 +38,8 @@ static void handle_field(Term_Cursor **cursor, int value) {
     (*cursor)->attr.italic = 1;
   } else if (value == 4) {
     (*cursor)->attr.underline = 1;
+  } else if (value == 5) {
+    (*cursor)->attr.blink = 1;
   } else if (value == 7) {
     (*cursor)->attr.reverse = 1;
   } else if (value >= 30 && value <= 37) {
@@ -58,6 +61,8 @@ static void handle_field(Term_Cursor **cursor, int value) {
     (*cursor)->attr.italic = 0;
   } else if (value == 24) {
     (*cursor)->attr.underline = 0;
+  } else if (value == 25) {
+    (*cursor)->attr.blink = 0;
   } else if (value == 27) {
     (*cursor)->attr.reverse = 0;
   }

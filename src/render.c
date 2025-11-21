@@ -384,6 +384,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           fg_color = &dim_color;
         }
 
+        if (cell.attr.blink && !gui->cursor_visible)
+          goto skip_text;
+
         XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
                           pixel_y + gui->char_ascent, (FcChar8 *)cell.data,
                           cell.length);
