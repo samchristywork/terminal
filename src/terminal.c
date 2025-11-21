@@ -358,8 +358,13 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
       terminal->mouse_mode = enable ? 3 : 0;
     else if (starts_with(token.value, token.length, "\x1b[?1006"))
       terminal->mouse_sgr = enable;
-    else if (starts_with(token.value, token.length, "\x1b[?1049"))
+    else if (starts_with(token.value, token.length, "\x1b[?1049")) {
+      if (enable && !terminal->using_alt_screen)
+        terminal->screen.saved_cursor = terminal->screen.cursor;
       terminal->using_alt_screen = enable;
+      if (!enable)
+        terminal->screen.cursor = terminal->screen.saved_cursor;
+    }
     else if (starts_with(token.value, token.length, "\x1b[?25"))
       screen->cursor_hidden = !enable;
     else if (starts_with(token.value, token.length, "\x1b[?2004"))
