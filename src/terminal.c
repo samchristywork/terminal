@@ -123,6 +123,10 @@ static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
   } else if (ends_with(token.value, token.length, 'm')) {
     if (token.length < 3)
       return;
+    if (token.length == 3) {
+      handle_field(cursor, 0);
+      return;
+    }
     for (int i = 2; i < token.length - 1;) {
       int j = i;
       while (j < token.length - 1 && token.value[j] != ';')
