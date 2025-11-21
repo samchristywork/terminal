@@ -856,6 +856,9 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
           cursor->y--;
       }
       break;
+    case TOKEN_BEL:
+      terminal->bell_pending = true;
+      break;
     case TOKEN_OSC:
       handle_osc(terminal, token);
       break;

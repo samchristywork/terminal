@@ -183,7 +183,7 @@ Term_Tokens *tokenize(const char *text, int length) {
     } else if (matches(text, length, i, "\t", &len)) {
       add_token(tokens, TOKEN_TAB, text, i, len);
     } else if (text[i] == '\x07') {
-      // Bell character
+      add_token(tokens, TOKEN_BEL, text, i, 1);
       len = 1;
     } else {
       int start = i;

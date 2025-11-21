@@ -301,7 +301,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
 
-  XSetForeground(gui->display, gui->gc, gui->default_bg);
+  XSetForeground(gui->display, gui->gc,
+                 gui->bell_flash ? gui->default_fg : gui->default_bg);
   XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, 0,
                  gui->window_width, gui->window_height);
 

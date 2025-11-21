@@ -57,6 +57,8 @@ typedef struct {
   char font_base[256];
   char font_bold_base[256];
   char font_italic_base[256];
+  bool bell_flash;
+  struct timespec bell_start;
   struct timespec last_click_time;
   int last_click_x;
   int last_click_y;

@@ -90,6 +90,7 @@ typedef struct {
   bool bg_dirty;
   unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
   int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking underline, 4=steady underline, 5=blinking bar, 6=steady bar
+  bool bell_pending;
   char response_buf[256];
   int response_len;
   char window_title_stack[32][256];
@@ -121,6 +122,7 @@ typedef enum {
   TOKEN_BACKSPACE,           // \b or 0x7f
   TOKEN_OSC,                 // ESC ] ... BEL/ST
   TOKEN_REVERSE_INDEX,       // ESC M
+  TOKEN_BEL,                 // \a (0x07)
   TOKEN_UNKNOWN,
 } Term_TokenType;
 

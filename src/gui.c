@@ -192,6 +192,7 @@ int init_gui(GuiContext *gui, Args *args) {
 
   gui->cursor_visible = true;
   clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
+  gui->bell_flash = false;
   gui->last_click_time.tv_sec = 0;
   gui->last_click_time.tv_nsec = 0;
   gui->last_click_x = -1;
@@ -409,6 +410,16 @@ int main(int argc, char *argv[]) {
       XFlush(gui.display);
     }
 
+    if (gui.bell_flash) {
+      long bell_ms = (now.tv_sec - gui.bell_start.tv_sec) * 1000 +
+                     (now.tv_nsec - gui.bell_start.tv_nsec) / 1000000;
+      if (bell_ms >= 150) {
+        gui.bell_flash = false;
+        draw_terminal(&gui, &terminal);
+        XFlush(gui.display);
+      }
+    }
+
     while (XPending(gui.display)) {
       XNextEvent(gui.display, &event);
       handle_events(&gui, &terminal, &event);
@@ -477,6 +488,11 @@ int main(int argc, char *argv[]) {
         XftColorAllocValue(gui.display, visual, colormap, &xrender_color,
                            &gui.xft_default_bg);
         terminal.bg_dirty = false;
+      }
+      if (terminal.bell_pending) {
+        gui.bell_flash = true;
+        gui.bell_start = now;
+        terminal.bell_pending = false;
       }
       draw_terminal(&gui, &terminal);
       XFlush(gui.display);
