@@ -91,6 +91,9 @@ typedef struct {
   unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
   int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking underline, 4=steady underline, 5=blinking bar, 6=steady bar
   bool bell_pending;
+  char *osc52_text;
+  int osc52_len;
+  bool osc52_dirty;
   char response_buf[256];
   int response_len;
   char window_title_stack[32][256];

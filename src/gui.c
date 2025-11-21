@@ -494,6 +494,17 @@ int main(int argc, char *argv[]) {
         gui.bell_start = now;
         terminal.bell_pending = false;
       }
+      if (terminal.osc52_dirty) {
+        free(gui.selection_text);
+        gui.selection_text = terminal.osc52_text;
+        gui.selection_len = terminal.osc52_len;
+        terminal.osc52_text = NULL;
+        terminal.osc52_len = 0;
+        terminal.osc52_dirty = false;
+        gui.has_selection = true;
+        XSetSelectionOwner(gui.display, gui.atom_clipboard, gui.window,
+                           CurrentTime);
+      }
       draw_terminal(&gui, &terminal);
       XFlush(gui.display);
     }

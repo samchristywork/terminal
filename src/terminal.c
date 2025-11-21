@@ -525,6 +525,34 @@ static bool parse_color(const char *val, int len, unsigned long *rgb) {
   return false;
 }
 
+static int base64_digit(unsigned char c) {
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+
+static int base64_decode(const char *in, int in_len, char **out) {
+  char *buf = malloc((in_len * 3) / 4 + 2);
+  if (!buf) return -1;
+  int pos = 0, acc = 0, acc_bits = 0;
+  for (int i = 0; i < in_len; i++) {
+    int v = base64_digit((unsigned char)in[i]);
+    if (v < 0) continue;
+    acc = (acc << 6) | v;
+    acc_bits += 6;
+    if (acc_bits >= 8) {
+      acc_bits -= 8;
+      buf[pos++] = (char)((acc >> acc_bits) & 0xff);
+    }
+  }
+  buf[pos] = '\0';
+  *out = buf;
+  return pos;
+}
+
 static void handle_osc(Terminal *terminal, Term_Token token) {
   int i = 2;
   int cmd = 0;
@@ -592,6 +620,33 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
         }
       }
     }
+  } else if (cmd == 52) {
+    // Find semicolon separating target from base64 data
+    int semi = i;
+    while (semi < token.length && token.value[semi] != ';')
+      semi++;
+    if (semi >= token.length)
+      return;
+    const char *data = &token.value[semi + 1];
+    int data_len = token.length - (semi + 1);
+    // Strip BEL or ST terminator
+    if (data_len > 0 && (unsigned char)data[data_len - 1] == 0x07)
+      data_len--;
+    else if (data_len >= 2 && data[data_len - 2] == '\x1b' &&
+             data[data_len - 1] == '\\')
+      data_len -= 2;
+    if (data_len <= 0)
+      return;
+    if (data_len == 1 && data[0] == '?')
+      return; // clipboard query not yet implemented
+    char *decoded = NULL;
+    int decoded_len = base64_decode(data, data_len, &decoded);
+    if (decoded_len >= 0) {
+      free(terminal->osc52_text);
+      terminal->osc52_text = decoded;
+      terminal->osc52_len = decoded_len;
+      terminal->osc52_dirty = true;
+    }
   } else if (cmd == 7 || cmd == 133) {
 
     // OSC 7: current working directory notification
@@ -648,6 +703,7 @@ static void handle_erase(Term_Screen *screen, Term_TokenType type,
 void free_terminal(Terminal *terminal) {
   free_screen(&terminal->screen, terminal->height);
   free_screen(&terminal->alt_screen, terminal->height);
+  free(terminal->osc52_text);
 }
 
 void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines) {
@@ -667,6 +723,10 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->bg_dirty = false;
   terminal->default_fg_rgb = 0xffffff;
   terminal->cursor_shape = 0;
+  terminal->bell_pending = false;
+  terminal->osc52_text = NULL;
+  terminal->osc52_len = 0;
+  terminal->osc52_dirty = false;
   terminal->response_len = 0;
   terminal->window_title_stack_depth = 0;
   terminal->icon_name_stack_depth = 0;
