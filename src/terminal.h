@@ -32,6 +32,7 @@ typedef struct {
   int italic;
   int blink;
   int underline;
+  int strikethrough;
   int reverse;
 } Term_Attr;
 
