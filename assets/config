@@ -1,0 +1,37 @@
+# terminal configuration file
+# copy to ~/.config/terminal/config
+
+# Font settings
+# font = Monospace
+# font-size = 14
+
+# Window margin in pixels
+# margin = 10
+
+# Scrollback buffer size
+# scrollback = 1000
+
+# Log file (default: stdout)
+# log-file = /tmp/terminal.log
+
+# Foreground and background colors (hex RGB)
+# fg = ffffff
+# bg = 000000
+
+# 16-color palette (ANSI colors 0-15)
+# color0  = 000000   # black
+# color1  = cc0000   # red
+# color2  = 4e9a06   # green
+# color3  = c4a000   # yellow
+# color4  = 3465a4   # blue
+# color5  = 75507b   # magenta
+# color6  = 06989a   # cyan
+# color7  = d3d7cf   # white
+# color8  = 555753   # bright black
+# color9  = ef2929   # bright red
+# color10 = 8ae234   # bright green
+# color11 = fce94f   # bright yellow
+# color12 = 729fcf   # bright blue
+# color13 = ad7fa8   # bright magenta
+# color14 = 34e2e2   # bright cyan
+# color15 = eeeeec   # bright white
