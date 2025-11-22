@@ -12,44 +12,53 @@ static void strip(char *s) {
 }
 
 static char *ltrim(char *s) {
-  while (*s == ' ' || *s == '\t') s++;
+  while (*s == ' ' || *s == '\t')
+    s++;
   return s;
 }
 
 static void load_config(Args *args) {
   const char *home = getenv("HOME");
-  if (!home) return;
+  if (!home)
+    return;
 
   char path[512];
   snprintf(path, sizeof(path), "%s/.config/terminal/config", home);
 
   FILE *f = fopen(path, "r");
-  if (!f) return;
+  if (!f)
+    return;
 
   char line[512];
   while (fgets(line, sizeof(line), f)) {
     char *p = ltrim(line);
-    if (*p == '#' || *p == '\0' || *p == '\n') continue;
+    if (*p == '#' || *p == '\0' || *p == '\n')
+      continue;
 
     char *eq = strchr(p, '=');
-    if (!eq) continue;
+    if (!eq)
+      continue;
 
     *eq = '\0';
     char *key = p;
     strip(key);
     char *val = ltrim(eq + 1);
     strip(val);
-    if (!*key || !*val) continue;
+    if (!*key || !*val)
+      continue;
 
     if (strcmp(key, "font-size") == 0) {
       int v = atoi(val);
-      if (v > 0) args->font_size = v;
+      if (v > 0)
+        args->font_size = v;
     } else if (strcmp(key, "scrollback") == 0) {
       int v = atoi(val);
-      if (v > 0) args->scrollback = v;
+      if (v > 0)
+        args->scrollback = v;
     } else if (strcmp(key, "margin") == 0) {
       int v = atoi(val);
-      if (v >= 0) args->margin = v;
+      if (v >= 0)
+        args->margin = v;
     } else if (strcmp(key, "font") == 0) {
       args->font = strdup(val);
     } else if (strcmp(key, "fg") == 0) {
@@ -64,7 +73,8 @@ static void load_config(Args *args) {
         args->palette[n] = strtol(val, NULL, 16);
     } else if (strcmp(key, "alpha") == 0) {
       int v = atoi(val);
-      if (v >= 0 && v <= 255) args->alpha = v;
+      if (v >= 0 && v <= 255)
+        args->alpha = v;
     }
   }
   fclose(f);
@@ -87,8 +97,11 @@ void print_usage(const char *program_name) {
                   "with hex value\n");
   fprintf(stderr,
           "  --log-file FILE       Write logs to FILE instead of stdout\n");
-  fprintf(stderr, "  --margin N            Set window margin in pixels (default: 10)\n");
-  fprintf(stderr, "  --alpha N             Window opacity 0-255 (default: 255, requires compositor)\n");
+  fprintf(
+      stderr,
+      "  --margin N            Set window margin in pixels (default: 10)\n");
+  fprintf(stderr, "  --alpha N             Window opacity 0-255 (default: 255, "
+                  "requires compositor)\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
 

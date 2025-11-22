@@ -39,9 +39,9 @@ int init_gui(GuiContext *gui, Args *args) {
     XVisualInfo vinfo;
     if (XMatchVisualInfo(gui->display, gui->screen, 32, TrueColor, &vinfo)) {
       visual = vinfo.visual;
-      colormap = XCreateColormap(gui->display,
-                                 RootWindow(gui->display, gui->screen),
-                                 visual, AllocNone);
+      colormap =
+          XCreateColormap(gui->display, RootWindow(gui->display, gui->screen),
+                          visual, AllocNone);
       depth = 32;
       gui->owns_colormap = true;
     }
@@ -69,9 +69,8 @@ int init_gui(GuiContext *gui, Args *args) {
   xwa.background_pixel = 0;
   xwa.border_pixel = 0;
   gui->window = XCreateWindow(
-      gui->display, RootWindow(gui->display, gui->screen),
-      100, 100, gui->window_width, gui->window_height, 0,
-      depth, InputOutput, visual,
+      gui->display, RootWindow(gui->display, gui->screen), 100, 100,
+      gui->window_width, gui->window_height, 0, depth, InputOutput, visual,
       CWColormap | CWBackPixel | CWBorderPixel, &xwa);
 
   XSelectInput(gui->display, gui->window,
@@ -191,7 +190,8 @@ int init_gui(GuiContext *gui, Args *args) {
              regular_base, font_size);
     gui->font_italic = XftFontOpenName(gui->display, gui->screen, font_pattern);
     if (gui->font_italic)
-      snprintf(italic_base, sizeof(italic_base), "%s:slant=italic", regular_base);
+      snprintf(italic_base, sizeof(italic_base), "%s:slant=italic",
+               regular_base);
   }
   if (!gui->font_italic)
     gui->font_italic = gui->font;
@@ -201,7 +201,8 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->font_size = font_size;
   snprintf(gui->font_base, sizeof(gui->font_base), "%s", regular_base);
   snprintf(gui->font_bold_base, sizeof(gui->font_bold_base), "%s", bold_base);
-  snprintf(gui->font_italic_base, sizeof(gui->font_italic_base), "%s", italic_base);
+  snprintf(gui->font_italic_base, sizeof(gui->font_italic_base), "%s",
+           italic_base);
 
   gui->char_width = gui->font->max_advance_width;
   if (gui->font_bold && gui->font_bold != gui->font &&
@@ -213,15 +214,15 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
                                   gui->window_height, depth);
 
-  gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer, visual, colormap);
+  gui->xft_draw =
+      XftDrawCreate(gui->display, gui->backbuffer, visual, colormap);
 
   gui->backbuffer_picture = None;
   if (args->alpha < 255) {
     XRenderPictFormat *fmt = XRenderFindVisualFormat(gui->display, visual);
     if (fmt)
-      gui->backbuffer_picture = XRenderCreatePicture(gui->display,
-                                                     gui->backbuffer, fmt,
-                                                     0, NULL);
+      gui->backbuffer_picture =
+          XRenderCreatePicture(gui->display, gui->backbuffer, fmt, 0, NULL);
   }
 
   gui->cursor_visible = true;
@@ -246,8 +247,8 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
     return;
 
   bool bold_separate = (gui->font_bold != gui->font);
-  bool italic_separate = (gui->font_italic != gui->font &&
-                          gui->font_italic != gui->font_bold);
+  bool italic_separate =
+      (gui->font_italic != gui->font && gui->font_italic != gui->font_bold);
   XftFontClose(gui->display, gui->font);
   if (bold_separate)
     XftFontClose(gui->display, gui->font_bold);
@@ -322,8 +323,10 @@ void change_font_size(GuiContext *gui, Terminal *terminal, int delta) {
   resize_terminal(terminal, term_cols, term_rows);
 
   struct winsize ws = {
-      .ws_row = term_rows, .ws_col = term_cols,
-      .ws_xpixel = 0,      .ws_ypixel = 0,
+      .ws_row = term_rows,
+      .ws_col = term_cols,
+      .ws_xpixel = 0,
+      .ws_ypixel = 0,
   };
   ioctl(gui->pipe_fd, TIOCSWINSZ, &ws);
   kill(gui->child_pid, SIGWINCH);
@@ -495,8 +498,9 @@ int main(int argc, char *argv[]) {
         color.green = ((fg_val >> 8) & 0xff) << 8;
         color.blue = (fg_val & 0xff) << 8;
         color.flags = DoRed | DoGreen | DoBlue;
-        gui.default_fg =
-            XAllocColor(gui.display, colormap, &color) ? color.pixel : gui.white;
+        gui.default_fg = XAllocColor(gui.display, colormap, &color)
+                             ? color.pixel
+                             : gui.white;
         XftColorFree(gui.display, visual, colormap, &gui.xft_default_fg);
         XRenderColor xrender_color;
         xrender_color.red = color.red;
@@ -516,8 +520,9 @@ int main(int argc, char *argv[]) {
         color.green = ((bg_val >> 8) & 0xff) << 8;
         color.blue = (bg_val & 0xff) << 8;
         color.flags = DoRed | DoGreen | DoBlue;
-        gui.default_bg =
-            XAllocColor(gui.display, colormap, &color) ? color.pixel : gui.black;
+        gui.default_bg = XAllocColor(gui.display, colormap, &color)
+                             ? color.pixel
+                             : gui.black;
         XftColorFree(gui.display, visual, colormap, &gui.xft_default_bg);
         XRenderColor xrender_color;
         xrender_color.red = color.red;

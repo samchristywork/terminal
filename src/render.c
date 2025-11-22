@@ -198,8 +198,8 @@ XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
     xrender_color.blue = (unsigned short)(color.rgb.blue << 8);
     xrender_color.alpha = 0xffff;
-    XftColorAllocValue(gui->display, gui->visual, gui->colormap,
-                       &xrender_color, &gui->rgb_cache[slot]);
+    XftColorAllocValue(gui->display, gui->visual, gui->colormap, &xrender_color,
+                       &gui->rgb_cache[slot]);
     gui->rgb_cache_keys[slot] = key;
     gui->rgb_cache_valid[slot] = true;
     return &gui->rgb_cache[slot];
@@ -311,7 +311,8 @@ void run_search(GuiContext *gui, Terminal *terminal) {
     int col_at_byte[4096];
     int buf_len = 0;
 
-    for (int x = 0; x < terminal->width && buf_len < (int)sizeof(buf) - 7; x++) {
+    for (int x = 0; x < terminal->width && buf_len < (int)sizeof(buf) - 7;
+         x++) {
       Term_Cell cell;
       if (row < sb->count) {
         int idx = (sb->head + row) % sb->capacity;
@@ -359,8 +360,10 @@ void run_search(GuiContext *gui, Terminal *terminal) {
     }
     // Scroll to bring the focused match into view
     int target = scr->scrollback.count - gui->search_rows[gui->search_current];
-    if (target < 0) target = 0;
-    if (target > scr->scrollback.count) target = scr->scrollback.count;
+    if (target < 0)
+      target = 0;
+    if (target > scr->scrollback.count)
+      target = scr->scrollback.count;
     scr->scroll_offset = target;
   }
 }
@@ -375,13 +378,13 @@ static void bg_fill(GuiContext *gui, int x, int y, int w, int h,
     XFillRectangle(gui->display, gui->backbuffer, gui->gc, x, y, w, h);
   } else {
     XRenderColor xrc = {
-      .red   = (unsigned short)(((rgb >> 16) & 0xFF) * 257),
-      .green = (unsigned short)(((rgb >> 8) & 0xFF) * 257),
-      .blue  = (unsigned short)((rgb & 0xFF) * 257),
-      .alpha = (unsigned short)(alpha * 257),
+        .red = (unsigned short)(((rgb >> 16) & 0xFF) * 257),
+        .green = (unsigned short)(((rgb >> 8) & 0xFF) * 257),
+        .blue = (unsigned short)((rgb & 0xFF) * 257),
+        .alpha = (unsigned short)(alpha * 257),
     };
-    XRenderFillRectangle(gui->display, PictOpSrc,
-                         gui->backbuffer_picture, &xrc, x, y, w, h);
+    XRenderFillRectangle(gui->display, PictOpSrc, gui->backbuffer_picture, &xrc,
+                         x, y, w, h);
   }
 }
 
@@ -397,11 +400,11 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
   // Clear entire backbuffer: transparent bg, or opaque fg during bell flash
   if (gui->bell_flash) {
-    bg_fill(gui, 0, 0, gui->window_width, gui->window_height,
-            gui->default_fg, 255);
+    bg_fill(gui, 0, 0, gui->window_width, gui->window_height, gui->default_fg,
+            255);
   } else {
-    bg_fill(gui, 0, 0, gui->window_width, gui->window_height,
-            gui->default_bg, gui->alpha);
+    bg_fill(gui, 0, 0, gui->window_width, gui->window_height, gui->default_bg,
+            gui->alpha);
   }
 
   int scroll_offset = term_screen->scroll_offset;
@@ -412,12 +415,17 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       int combined_row = sb->count - scroll_offset + y;
       int oldest = sb->count - sb->capacity;
       for (int m = 0; m < terminal->shell_mark_count; m++) {
-        int mark = terminal->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
-        if (mark < oldest) continue;
+        int mark =
+            terminal
+                ->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+        if (mark < oldest)
+          continue;
         if (mark == combined_row) {
-          XSetForeground(gui->display, gui->gc, opaque_pixel(gui, gui->colors[2]));
-          XFillRectangle(gui->display, gui->backbuffer, gui->gc,
-                         0, y * gui->char_height + gui->margin, 3, gui->char_height);
+          XSetForeground(gui->display, gui->gc,
+                         opaque_pixel(gui, gui->colors[2]));
+          XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0,
+                         y * gui->char_height + gui->margin, 3,
+                         gui->char_height);
           break;
         }
       }
@@ -442,8 +450,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       int pixel_y = y * (gui->char_height) + gui->margin;
       int draw_width = cell.wide ? gui->char_width * 2 : gui->char_width;
 
-      bool is_default_bg = (cell.attr.bg.type == COLOR_DEFAULT &&
-                            cell.attr.bg.color == 0);
+      bool is_default_bg =
+          (cell.attr.bg.type == COLOR_DEFAULT && cell.attr.bg.color == 0);
       unsigned long bg_color = gui->default_bg;
       if (!is_default_bg) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
@@ -451,7 +459,8 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       if (gui->search_active) {
         for (int m = 0; m < gui->search_match_count; m++) {
-          if (gui->search_rows[m] > combined) break;
+          if (gui->search_rows[m] > combined)
+            break;
           if (gui->search_rows[m] == combined &&
               gui->search_start_cols[m] <= x && x <= gui->search_end_cols[m]) {
             Term_Color hc;
@@ -497,14 +506,14 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       // Default-bg cells are already painted by the initial clear; only draw
       // explicitly-colored backgrounds (and always opaque).
       int cell_alpha = is_default_bg ? gui->alpha : 255;
-      bg_fill(gui, pixel_x, pixel_y, draw_width, gui->char_height,
-              bg_color, cell_alpha);
+      bg_fill(gui, pixel_x, pixel_y, draw_width, gui->char_height, bg_color,
+              cell_alpha);
 
       if (cell.length > 0) {
         XftColor *fg_color;
-        XftFont *font_to_use = cell.attr.bold   ? gui->font_bold
-                             : cell.attr.italic ? gui->font_italic
-                                                : gui->font;
+        XftFont *font_to_use = cell.attr.bold     ? gui->font_bold
+                               : cell.attr.italic ? gui->font_italic
+                                                  : gui->font;
 
         if (reverse) {
           fg_color =
@@ -521,9 +530,9 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XftColor dim_color;
         if (cell.attr.dim && !reverse) {
           dim_color = *fg_color;
-          dim_color.color.red   >>= 1;
+          dim_color.color.red >>= 1;
           dim_color.color.green >>= 1;
-          dim_color.color.blue  >>= 1;
+          dim_color.color.blue >>= 1;
           fg_color = &dim_color;
         }
 
@@ -537,22 +546,21 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         if (cell.attr.underline || cell.attr.uri_idx > 0) {
           XSetForeground(gui->display, gui->gc, opaque_pixel(gui, text_color));
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                    pixel_y + gui->char_height - 1,
-                    pixel_x + draw_width - 1,
+                    pixel_y + gui->char_height - 1, pixel_x + draw_width - 1,
                     pixel_y + gui->char_height - 1);
         }
         if (cell.attr.strikethrough) {
           XSetForeground(gui->display, gui->gc, opaque_pixel(gui, text_color));
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                    pixel_y + gui->char_ascent / 2,
-                    pixel_x + draw_width - 1,
+                    pixel_y + gui->char_ascent / 2, pixel_x + draw_width - 1,
                     pixel_y + gui->char_ascent / 2);
         }
-        skip_text:;
+      skip_text:;
       }
 
       if (is_cursor && !is_block_cursor) {
-        XSetForeground(gui->display, gui->gc, opaque_pixel(gui, gui->default_fg));
+        XSetForeground(gui->display, gui->gc,
+                       opaque_pixel(gui, gui->default_fg));
         if (cursor_shape == 3 || cursor_shape == 4) {
           XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
                          pixel_y + gui->char_height - 2, draw_width, 2);
@@ -567,23 +575,24 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   if (gui->search_active) {
     int bar_y = gui->window_height - gui->char_height - gui->margin;
     Term_Color bar_bg = {.type = COLOR_RGB, .rgb = {255, 220, 50}};
-    XSetForeground(gui->display, gui->gc, opaque_pixel(gui, get_color_pixel(gui, bar_bg)));
-    XFillRectangle(gui->display, gui->backbuffer, gui->gc,
-                   0, bar_y, gui->window_width, gui->char_height + gui->margin);
+    XSetForeground(gui->display, gui->gc,
+                   opaque_pixel(gui, get_color_pixel(gui, bar_bg)));
+    XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, bar_y,
+                   gui->window_width, gui->char_height + gui->margin);
     char bar[400];
     int blen;
     if (gui->search_query_len == 0) {
       blen = snprintf(bar, sizeof(bar), " /");
     } else if (gui->search_match_count == 0) {
-      blen = snprintf(bar, sizeof(bar), " /%s  [no matches]", gui->search_query);
+      blen =
+          snprintf(bar, sizeof(bar), " /%s  [no matches]", gui->search_query);
     } else {
-      blen = snprintf(bar, sizeof(bar), " /%s  [%d/%d]",
-                      gui->search_query, gui->search_current + 1,
-                      gui->search_match_count);
+      blen = snprintf(bar, sizeof(bar), " /%s  [%d/%d]", gui->search_query,
+                      gui->search_current + 1, gui->search_match_count);
     }
     XftDrawStringUtf8(gui->xft_draw, &gui->xft_colors[0], gui->font,
-                      gui->margin, bar_y + gui->char_ascent,
-                      (FcChar8 *)bar, blen > 0 ? blen : 0);
+                      gui->margin, bar_y + gui->char_ascent, (FcChar8 *)bar,
+                      blen > 0 ? blen : 0);
   }
 
   XCopyArea(gui->display, gui->backbuffer, gui->window, gui->gc, 0, 0,

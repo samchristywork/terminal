@@ -95,7 +95,9 @@ typedef struct {
   unsigned long osc_bg; // packed 0xRRGGBB set by OSC 11
   bool bg_dirty;
   unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
-  int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking underline, 4=steady underline, 5=blinking bar, 6=steady bar
+  int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking
+                    // underline, 4=steady underline, 5=blinking bar, 6=steady
+                    // bar
   bool bell_pending;
   char *osc52_text;
   int osc52_len;
@@ -109,7 +111,8 @@ typedef struct {
   char *uri_table[1024];
   int uri_count;
 #define SHELL_MARK_MAX 512
-  int shell_marks[SHELL_MARK_MAX]; // absolute row (scrollback.count + cursor.y) at OSC 133;A
+  int shell_marks[SHELL_MARK_MAX]; // absolute row (scrollback.count + cursor.y)
+                                   // at OSC 133;A
   int shell_mark_count;
   int shell_mark_head;
 } Terminal;
@@ -153,7 +156,8 @@ typedef struct {
   int count;
 } Term_Tokens;
 
-void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines);
+void init_terminal(Terminal *terminal, int width, int height,
+                   int scrollback_lines);
 
 void reset_terminal(Terminal *terminal);
 

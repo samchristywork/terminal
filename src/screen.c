@@ -5,9 +5,11 @@
 #include "terminal.h"
 
 static int utf8_decode(const char *s, int len) {
-  if (len <= 0) return -1;
+  if (len <= 0)
+    return -1;
   unsigned char c = (unsigned char)s[0];
-  if (c < 0x80) return c;
+  if (c < 0x80)
+    return c;
   if ((c & 0xE0) == 0xC0 && len >= 2)
     return ((c & 0x1F) << 6) | ((unsigned char)s[1] & 0x3F);
   if ((c & 0xF0) == 0xE0 && len >= 3)
@@ -20,42 +22,75 @@ static int utf8_decode(const char *s, int len) {
 }
 
 static int is_wide_codepoint(int cp) {
-  if (cp < 0x1100) return 0;
-  if (cp <= 0x115F) return 1;  // Hangul Jamo
-  if (cp < 0x2E80) return 0;
-  if (cp <= 0x303E) return 1;  // CJK Radicals through CJK Symbols
-  if (cp < 0x3041) return 0;
-  if (cp <= 0x33FF) return 1;  // Hiragana, Katakana, Bopomofo, CJK Compat
-  if (cp < 0x3400) return 0;
-  if (cp <= 0x4DBF) return 1;  // CJK Extension A
-  if (cp < 0x4E00) return 0;
-  if (cp <= 0x9FFF) return 1;  // CJK Unified Ideographs
-  if (cp < 0xA000) return 0;
-  if (cp <= 0xA4CF) return 1;  // Yi
-  if (cp < 0xA960) return 0;
-  if (cp <= 0xA97F) return 1;  // Hangul Jamo Extended-A
-  if (cp < 0xAC00) return 0;
-  if (cp <= 0xD7AF) return 1;  // Hangul Syllables
-  if (cp < 0xF900) return 0;
-  if (cp <= 0xFAFF) return 1;  // CJK Compatibility Ideographs
-  if (cp < 0xFE10) return 0;
-  if (cp <= 0xFE6F) return 1;  // Vertical, CJK Compat, Small Forms
-  if (cp < 0xFF01) return 0;
-  if (cp <= 0xFF60) return 1;  // Fullwidth ASCII and punctuation
-  if (cp < 0xFFE0) return 0;
-  if (cp <= 0xFFE6) return 1;  // Fullwidth signs
-  if (cp < 0x1B000) return 0;
-  if (cp <= 0x1B0FF) return 1;  // Kana Supplement
-  if (cp < 0x1F300) return 0;
-  if (cp <= 0x1F9FF) return 1;  // Emoji and Misc Symbols
-  if (cp < 0x20000) return 0;
-  if (cp <= 0x2FFFD) return 1;  // CJK Extension B–F
-  if (cp < 0x30000) return 0;
-  if (cp <= 0x3FFFD) return 1;  // CJK Extension G
+  if (cp < 0x1100)
+    return 0;
+  if (cp <= 0x115F)
+    return 1; // Hangul Jamo
+  if (cp < 0x2E80)
+    return 0;
+  if (cp <= 0x303E)
+    return 1; // CJK Radicals through CJK Symbols
+  if (cp < 0x3041)
+    return 0;
+  if (cp <= 0x33FF)
+    return 1; // Hiragana, Katakana, Bopomofo, CJK Compat
+  if (cp < 0x3400)
+    return 0;
+  if (cp <= 0x4DBF)
+    return 1; // CJK Extension A
+  if (cp < 0x4E00)
+    return 0;
+  if (cp <= 0x9FFF)
+    return 1; // CJK Unified Ideographs
+  if (cp < 0xA000)
+    return 0;
+  if (cp <= 0xA4CF)
+    return 1; // Yi
+  if (cp < 0xA960)
+    return 0;
+  if (cp <= 0xA97F)
+    return 1; // Hangul Jamo Extended-A
+  if (cp < 0xAC00)
+    return 0;
+  if (cp <= 0xD7AF)
+    return 1; // Hangul Syllables
+  if (cp < 0xF900)
+    return 0;
+  if (cp <= 0xFAFF)
+    return 1; // CJK Compatibility Ideographs
+  if (cp < 0xFE10)
+    return 0;
+  if (cp <= 0xFE6F)
+    return 1; // Vertical, CJK Compat, Small Forms
+  if (cp < 0xFF01)
+    return 0;
+  if (cp <= 0xFF60)
+    return 1; // Fullwidth ASCII and punctuation
+  if (cp < 0xFFE0)
+    return 0;
+  if (cp <= 0xFFE6)
+    return 1; // Fullwidth signs
+  if (cp < 0x1B000)
+    return 0;
+  if (cp <= 0x1B0FF)
+    return 1; // Kana Supplement
+  if (cp < 0x1F300)
+    return 0;
+  if (cp <= 0x1F9FF)
+    return 1; // Emoji and Misc Symbols
+  if (cp < 0x20000)
+    return 0;
+  if (cp <= 0x2FFFD)
+    return 1; // CJK Extension B–F
+  if (cp < 0x30000)
+    return 0;
+  if (cp <= 0x3FFFD)
+    return 1; // CJK Extension G
   return 0;
 }
 
-void init_screen(Term_Screen *screen, int width, int height, int scrollback_lines) {
+void init_screen(Term_Screen *screen, int width, int height,
+                 int scrollback_lines) {
   memset(&screen->cursor, 0, sizeof(Term_Cursor));
   screen->lines = (Term_Line *)malloc(height * sizeof(Term_Line));
   for (int i = 0; i < height; i++) {
@@ -181,7 +216,8 @@ void write_regular_cell(Term_Screen *screen, const char *data, int data_len,
     screen->cursor.x++;
 
     if (char_display_width == 2 && screen->cursor.x < width) {
-      Term_Cell *cont = &screen->lines[screen->cursor.y].cells[screen->cursor.x];
+      Term_Cell *cont =
+          &screen->lines[screen->cursor.y].cells[screen->cursor.x];
       *cont = (Term_Cell){.attr = attr, .wide_cont = 1};
       screen->cursor.x++;
     }

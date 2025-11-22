@@ -7,8 +7,8 @@
 #include "terminal.h"
 #include "tokenize.h"
 
-static void handle_erase(Term_Screen *screen, Term_TokenType type,
-                         int width, int height);
+static void handle_erase(Term_Screen *screen, Term_TokenType type, int width,
+                         int height);
 
 static void terminal_respond(Terminal *t, const char *data, int len) {
   int available = (int)sizeof(t->response_buf) - t->response_len;
@@ -217,7 +217,8 @@ static int incomplete_escape_tail(const char *buf, int len) {
   return 0;
 }
 
-static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token) {
+static void handle_csi(Terminal *terminal, Term_Screen *screen,
+                       Term_Token token) {
   int width = terminal->width;
   int height = terminal->height;
   Term_Cursor *cursor = &screen->cursor;
@@ -362,13 +363,11 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
       terminal->using_alt_screen = enable;
       if (!enable)
         terminal->screen.cursor = terminal->screen.saved_cursor;
-    }
-    else if (starts_with(token.value, token.length, "\x1b[?25"))
+    } else if (starts_with(token.value, token.length, "\x1b[?25"))
       screen->cursor_hidden = !enable;
     else if (starts_with(token.value, token.length, "\x1b[?2004"))
       terminal->bracketed_paste = enable;
-  }
- else if (final == 't') {
+  } else if (final == 't') {
     const char *p = token.value + 2;
     const char *end = token.value + token.length - 1;
     int n1 = 0, n2 = 0;
@@ -382,8 +381,9 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
     if (n1 == 22) {
       if (n2 == 0 || n2 == 2) {
         if (terminal->window_title_stack_depth < 32) {
-          memcpy(terminal->window_title_stack[terminal->window_title_stack_depth],
-                 terminal->window_title, 256);
+          memcpy(
+              terminal->window_title_stack[terminal->window_title_stack_depth],
+              terminal->window_title, 256);
           terminal->window_title_stack_depth++;
         }
       }
@@ -398,9 +398,10 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
       if (n2 == 0 || n2 == 2) {
         if (terminal->window_title_stack_depth > 0) {
           terminal->window_title_stack_depth--;
-          memcpy(terminal->window_title,
-                 terminal->window_title_stack[terminal->window_title_stack_depth],
-                 256);
+          memcpy(
+              terminal->window_title,
+              terminal->window_title_stack[terminal->window_title_stack_depth],
+              256);
           terminal->title_dirty = true;
         }
       }
@@ -408,7 +409,8 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
         if (terminal->icon_name_stack_depth > 0) {
           terminal->icon_name_stack_depth--;
           memcpy(terminal->icon_name,
-                 terminal->icon_name_stack[terminal->icon_name_stack_depth], 256);
+                 terminal->icon_name_stack[terminal->icon_name_stack_depth],
+                 256);
           terminal->title_dirty = true;
         }
       }
@@ -416,8 +418,8 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen, Term_Token token
   } else if (final == 'n') {
     if (n == 6) {
       char buf[32];
-      int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dR",
-                         cursor->y + 1, cursor->x + 1);
+      int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dR", cursor->y + 1,
+                         cursor->x + 1);
       terminal_respond(terminal, buf, len);
     }
   } else if (final == 'c') {
@@ -521,9 +523,18 @@ static bool parse_color(const char *val, int len, unsigned long *rgb) {
     unsigned long g = strtoul(g_str, NULL, 16);
     unsigned long b = strtoul(b_str, NULL, 16);
 
-    if (r_len == 1) r = (r << 4) | r; else if (r_len > 2) r >>= (r_len - 2) * 4;
-    if (g_len == 1) g = (g << 4) | g; else if (g_len > 2) g >>= (g_len - 2) * 4;
-    if (b_len == 1) b = (b << 4) | b; else if (b_len > 2) b >>= (b_len - 2) * 4;
+    if (r_len == 1)
+      r = (r << 4) | r;
+    else if (r_len > 2)
+      r >>= (r_len - 2) * 4;
+    if (g_len == 1)
+      g = (g << 4) | g;
+    else if (g_len > 2)
+      g >>= (g_len - 2) * 4;
+    if (b_len == 1)
+      b = (b << 4) | b;
+    else if (b_len > 2)
+      b >>= (b_len - 2) * 4;
 
     *rgb = (r << 16) | (g << 8) | b;
     return true;
@@ -533,21 +544,28 @@ static bool parse_color(const char *val, int len, unsigned long *rgb) {
 }
 
 static int base64_digit(unsigned char c) {
-  if (c >= 'A' && c <= 'Z') return c - 'A';
-  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-  if (c >= '0' && c <= '9') return c - '0' + 52;
-  if (c == '+') return 62;
-  if (c == '/') return 63;
+  if (c >= 'A' && c <= 'Z')
+    return c - 'A';
+  if (c >= 'a' && c <= 'z')
+    return c - 'a' + 26;
+  if (c >= '0' && c <= '9')
+    return c - '0' + 52;
+  if (c == '+')
+    return 62;
+  if (c == '/')
+    return 63;
   return -1;
 }
 
 static int base64_decode(const char *in, int in_len, char **out) {
   char *buf = malloc((in_len * 3) / 4 + 2);
-  if (!buf) return -1;
+  if (!buf)
+    return -1;
   int pos = 0, acc = 0, acc_bits = 0;
   for (int i = 0; i < in_len; i++) {
     int v = base64_digit((unsigned char)in[i]);
-    if (v < 0) continue;
+    if (v < 0)
+      continue;
     acc = (acc << 6) | v;
     acc_bits += 6;
     if (acc_bits >= 8) {
@@ -665,10 +683,11 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
     int uri_len = token.length - (semi + 1);
     if (uri_len > 0 && (unsigned char)uri[uri_len - 1] == 0x07)
       uri_len--;
-    else if (uri_len >= 2 && uri[uri_len - 2] == '\x1b' && uri[uri_len - 1] == '\\')
+    else if (uri_len >= 2 && uri[uri_len - 2] == '\x1b' &&
+             uri[uri_len - 1] == '\\')
       uri_len -= 2;
-    Term_Screen *as = terminal->using_alt_screen ? &terminal->alt_screen
-                                                 : &terminal->screen;
+    Term_Screen *as =
+        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
     if (uri_len == 0) {
       as->cursor.attr.uri_idx = 0;
     } else {
@@ -718,8 +737,8 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
   }
 }
 
-static void handle_erase(Term_Screen *screen, Term_TokenType type,
-                         int width, int height) {
+static void handle_erase(Term_Screen *screen, Term_TokenType type, int width,
+                         int height) {
   Term_Cursor *cursor = &screen->cursor;
   Term_Cell blank = {0};
   blank.attr.bg = cursor->attr.bg;
@@ -770,7 +789,8 @@ void free_terminal(Terminal *terminal) {
     free(terminal->uri_table[i]);
 }
 
-void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines) {
+void init_terminal(Terminal *terminal, int width, int height,
+                   int scrollback_lines) {
   terminal->width = width;
   terminal->height = height;
   terminal->using_alt_screen = false;
@@ -837,8 +857,10 @@ void resize_terminal(Terminal *terminal, int new_width, int new_height) {
   int old_width = terminal->width;
   int old_height = terminal->height;
 
-  resize_screen(&terminal->screen, old_width, old_height, new_width, new_height);
-  resize_screen(&terminal->alt_screen, old_width, old_height, new_width, new_height);
+  resize_screen(&terminal->screen, old_width, old_height, new_width,
+                new_height);
+  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
+                new_height);
 
   terminal->width = new_width;
   terminal->height = new_height;
@@ -855,7 +877,8 @@ static int incomplete_utf8_len(const char *buf, int len) {
   }
 
   if (i < 0) {
-    if (len > 0 && (unsigned char)buf[0] >= 0x80 && (unsigned char)buf[0] < 0xc0)
+    if (len > 0 && (unsigned char)buf[0] >= 0x80 &&
+        (unsigned char)buf[0] < 0xc0)
       return len > 3 ? 0 : len;
     return 0;
   }
@@ -901,7 +924,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
 
   if (tail >= combined_len) {
     int save = tail < (int)sizeof(terminal->partial_buf)
-                   ? tail : (int)sizeof(terminal->partial_buf) - 1;
+                   ? tail
+                   : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text, save);
     terminal->partial_len = save;
     free(combined);
@@ -909,7 +933,8 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   }
   if (tail > 0) {
     int save = tail < (int)sizeof(terminal->partial_buf)
-                   ? tail : (int)sizeof(terminal->partial_buf) - 1;
+                   ? tail
+                   : (int)sizeof(terminal->partial_buf) - 1;
     memcpy(terminal->partial_buf, text + combined_len - tail, save);
     terminal->partial_len = save;
     combined_len -= tail;
@@ -940,10 +965,14 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       while (j < token.length) {
         unsigned char c = (unsigned char)token.value[j];
         int char_len;
-        if (c < 0x80) char_len = 1;
-        else if (c < 0xE0) char_len = 2;
-        else if (c < 0xF0) char_len = 3;
-        else char_len = 4;
+        if (c < 0x80)
+          char_len = 1;
+        else if (c < 0xE0)
+          char_len = 2;
+        else if (c < 0xF0)
+          char_len = 3;
+        else
+          char_len = 4;
         if (j + char_len > token.length)
           char_len = token.length - j;
         write_regular_cell(screen, &token.value[j], char_len, width, height,

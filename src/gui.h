@@ -65,10 +65,10 @@ typedef struct {
   int last_click_x;
   int last_click_y;
   int margin;
-  int alpha;               // 0-255, 255 = fully opaque
-  Visual *visual;          // visual used for window/pixmap
-  Colormap colormap;       // colormap matching visual
-  bool owns_colormap;      // true if we created the colormap (must free)
+  int alpha;                  // 0-255, 255 = fully opaque
+  Visual *visual;             // visual used for window/pixmap
+  Colormap colormap;          // colormap matching visual
+  bool owns_colormap;         // true if we created the colormap (must free)
   Picture backbuffer_picture; // XRender picture for backbuffer (transparency)
 #define SEARCH_MAX_MATCHES 4096
   bool search_active;
