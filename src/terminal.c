@@ -701,10 +701,28 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
         }
       }
     }
-  } else if (cmd == 7 || cmd == 133) {
-
-    // OSC 7: current working directory notification
-    // OSC 133: shell integration (FinalTerm semantic zones)
+  } else if (cmd == 7) {
+    // OSC 7: current working directory notification (unused)
+  } else if (cmd == 133) {
+    // OSC 133 ; A/B/C/D FinalTerm shell integration
+    if (i >= token.length)
+      return;
+    char zone = token.value[i];
+    if (zone == 'A') {
+      Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen
+                                                    : &terminal->screen;
+      int mark = scr->scrollback.count + scr->cursor.y;
+      int idx = (terminal->shell_mark_head + terminal->shell_mark_count) %
+                SHELL_MARK_MAX;
+      if (terminal->shell_mark_count < SHELL_MARK_MAX) {
+        terminal->shell_marks[idx] = mark;
+        terminal->shell_mark_count++;
+      } else {
+        terminal->shell_marks[terminal->shell_mark_head] = mark;
+        terminal->shell_mark_head =
+            (terminal->shell_mark_head + 1) % SHELL_MARK_MAX;
+      }
+    }
   } else {
     char repr[128];
     token_repr(&token, repr, sizeof(repr));
@@ -787,6 +805,8 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->window_title_stack_depth = 0;
   terminal->icon_name_stack_depth = 0;
   terminal->uri_count = 0;
+  terminal->shell_mark_count = 0;
+  terminal->shell_mark_head = 0;
   init_screen(&terminal->screen, width, height, scrollback_lines);
   init_screen(&terminal->alt_screen, width, height, scrollback_lines);
 }
@@ -814,6 +834,8 @@ void reset_terminal(Terminal *terminal) {
     terminal->uri_table[i] = NULL;
   }
   terminal->uri_count = 0;
+  terminal->shell_mark_count = 0;
+  terminal->shell_mark_head = 0;
 }
 
 void resize_terminal(Terminal *terminal, int new_width, int new_height) {

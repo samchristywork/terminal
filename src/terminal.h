@@ -106,6 +106,10 @@ typedef struct {
   int icon_name_stack_depth;
   char *uri_table[1024];
   int uri_count;
+#define SHELL_MARK_MAX 512
+  int shell_marks[SHELL_MARK_MAX]; // absolute row (scrollback.count + cursor.y) at OSC 133;A
+  int shell_mark_count;
+  int shell_mark_head;
 } Terminal;
 
 typedef enum {

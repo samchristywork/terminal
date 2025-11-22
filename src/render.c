@@ -310,6 +310,21 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Scrollback *sb = &term_screen->scrollback;
 
   for (int y = 0; y < terminal->height; y++) {
+    if (gui->margin >= 4) {
+      int combined_row = sb->count - scroll_offset + y;
+      int oldest = sb->count - sb->capacity;
+      for (int m = 0; m < terminal->shell_mark_count; m++) {
+        int mark = terminal->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+        if (mark < oldest) continue;
+        if (mark == combined_row) {
+          XSetForeground(gui->display, gui->gc, gui->colors[2]);
+          XFillRectangle(gui->display, gui->backbuffer, gui->gc,
+                         0, y * gui->char_height + gui->margin, 3, gui->char_height);
+          break;
+        }
+      }
+    }
+
     for (int x = 0; x < terminal->width; x++) {
       Term_Cell cell;
       int combined = sb->count - scroll_offset + y;

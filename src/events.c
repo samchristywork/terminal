@@ -114,6 +114,38 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     write(gui->pipe_fd, "\t", 1);
   } else if (keysym == XK_Escape) {
     write(gui->pipe_fd, "\x1b", 1);
+  } else if (keysym == XK_Up && (ev->state & ControlMask) &&
+             (ev->state & ShiftMask)) {
+    int cur_top = scr->scrollback.count - scr->scroll_offset;
+    int oldest = scr->scrollback.count - scr->scrollback.capacity;
+    int best = -1;
+    for (int m = terminal->shell_mark_count - 1; m >= 0; m--) {
+      int mark = terminal->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+      if (mark < oldest) continue;
+      if (mark < cur_top) { best = mark; break; }
+    }
+    if (best >= 0) {
+      scr->scroll_offset = scr->scrollback.count - best;
+      if (scr->scroll_offset > max_scroll) scr->scroll_offset = max_scroll;
+      draw_terminal(gui, terminal);
+    }
+  } else if (keysym == XK_Down && (ev->state & ControlMask) &&
+             (ev->state & ShiftMask)) {
+    int cur_top = scr->scrollback.count - scr->scroll_offset;
+    int oldest = scr->scrollback.count - scr->scrollback.capacity;
+    int best = -1;
+    for (int m = 0; m < terminal->shell_mark_count; m++) {
+      int mark = terminal->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+      if (mark < oldest) continue;
+      if (mark > cur_top) { best = mark; break; }
+    }
+    if (best >= 0) {
+      scr->scroll_offset = scr->scrollback.count - best;
+      if (scr->scroll_offset < 0) scr->scroll_offset = 0;
+    } else {
+      scr->scroll_offset = 0;
+    }
+    draw_terminal(gui, terminal);
   } else if (keysym == XK_Up) {
     write(gui->pipe_fd,
           (ev->state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
