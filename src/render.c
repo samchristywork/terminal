@@ -337,8 +337,12 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         cell = term_screen->lines[combined - sb->count].cells[x];
       }
 
+      if (cell.wide_cont)
+        continue;
+
       int pixel_x = x * gui->char_width + gui->margin;
       int pixel_y = y * (gui->char_height) + gui->margin;
+      int draw_width = cell.wide ? gui->char_width * 2 : gui->char_width;
 
       unsigned long bg_color = gui->default_bg;
       if (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) {
@@ -370,7 +374,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
 
       XSetForeground(gui->display, gui->gc, bg_color);
       XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x, pixel_y,
-                     gui->char_width, gui->char_height);
+                     draw_width, gui->char_height);
 
       if (cell.length > 0) {
         XftColor *fg_color;
@@ -410,14 +414,14 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           XSetForeground(gui->display, gui->gc, text_color);
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_height - 1,
-                    pixel_x + gui->char_width - 1,
+                    pixel_x + draw_width - 1,
                     pixel_y + gui->char_height - 1);
         }
         if (cell.attr.strikethrough) {
           XSetForeground(gui->display, gui->gc, text_color);
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_ascent / 2,
-                    pixel_x + gui->char_width - 1,
+                    pixel_x + draw_width - 1,
                     pixel_y + gui->char_ascent / 2);
         }
         skip_text:;
@@ -427,7 +431,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         XSetForeground(gui->display, gui->gc, gui->default_fg);
         if (cursor_shape == 3 || cursor_shape == 4) {
           XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                         pixel_y + gui->char_height - 2, gui->char_width, 2);
+                         pixel_y + gui->char_height - 2, draw_width, 2);
         } else {
           XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
                          pixel_y, 2, gui->char_height);

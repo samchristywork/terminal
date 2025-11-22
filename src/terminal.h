@@ -42,6 +42,8 @@ typedef struct {
   char data[6];
   int length;
   Term_Attr attr;
+  int wide;      // 1 = left half of a double-width character
+  int wide_cont; // 1 = right half placeholder (no glyph drawn here)
 } Term_Cell;
 
 typedef struct {
