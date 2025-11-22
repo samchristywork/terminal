@@ -666,6 +666,41 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
       terminal->osc52_len = decoded_len;
       terminal->osc52_dirty = true;
     }
+  } else if (cmd == 8) {
+    // OSC 8 ; params ; uri BEL/ST hyperlinks
+    int semi = i;
+    while (semi < token.length && token.value[semi] != ';')
+      semi++;
+    if (semi >= token.length)
+      return;
+    const char *uri = &token.value[semi + 1];
+    int uri_len = token.length - (semi + 1);
+    if (uri_len > 0 && (unsigned char)uri[uri_len - 1] == 0x07)
+      uri_len--;
+    else if (uri_len >= 2 && uri[uri_len - 2] == '\x1b' && uri[uri_len - 1] == '\\')
+      uri_len -= 2;
+    Term_Screen *as = terminal->using_alt_screen ? &terminal->alt_screen
+                                                 : &terminal->screen;
+    if (uri_len == 0) {
+      as->cursor.attr.uri_idx = 0;
+    } else {
+      for (int k = 0; k < terminal->uri_count; k++) {
+        if ((int)strlen(terminal->uri_table[k]) == uri_len &&
+            memcmp(terminal->uri_table[k], uri, uri_len) == 0) {
+          as->cursor.attr.uri_idx = (uint16_t)(k + 1);
+          return;
+        }
+      }
+      if (terminal->uri_count < 1023) {
+        char *s = malloc(uri_len + 1);
+        if (s) {
+          memcpy(s, uri, uri_len);
+          s[uri_len] = '\0';
+          terminal->uri_table[terminal->uri_count++] = s;
+          as->cursor.attr.uri_idx = (uint16_t)terminal->uri_count;
+        }
+      }
+    }
   } else if (cmd == 7 || cmd == 133) {
 
     // OSC 7: current working directory notification
@@ -723,6 +758,8 @@ void free_terminal(Terminal *terminal) {
   free_screen(&terminal->screen, terminal->height);
   free_screen(&terminal->alt_screen, terminal->height);
   free(terminal->osc52_text);
+  for (int i = 0; i < terminal->uri_count; i++)
+    free(terminal->uri_table[i]);
 }
 
 void init_terminal(Terminal *terminal, int width, int height, int scrollback_lines) {
@@ -749,6 +786,7 @@ void init_terminal(Terminal *terminal, int width, int height, int scrollback_lin
   terminal->response_len = 0;
   terminal->window_title_stack_depth = 0;
   terminal->icon_name_stack_depth = 0;
+  terminal->uri_count = 0;
   init_screen(&terminal->screen, width, height, scrollback_lines);
   init_screen(&terminal->alt_screen, width, height, scrollback_lines);
 }
@@ -771,6 +809,11 @@ void reset_terminal(Terminal *terminal) {
   terminal->response_len = 0;
   terminal->window_title_stack_depth = 0;
   terminal->icon_name_stack_depth = 0;
+  for (int i = 0; i < terminal->uri_count; i++) {
+    free(terminal->uri_table[i]);
+    terminal->uri_table[i] = NULL;
+  }
+  terminal->uri_count = 0;
 }
 
 void resize_terminal(Terminal *terminal, int new_width, int new_height) {

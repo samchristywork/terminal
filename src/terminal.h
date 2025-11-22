@@ -2,6 +2,7 @@
 #define TERMINAL_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
   int red;
@@ -34,6 +35,7 @@ typedef struct {
   int underline;
   int strikethrough;
   int reverse;
+  uint16_t uri_idx; // 0 = no link; >0 = 1-based index into terminal->uri_table
 } Term_Attr;
 
 typedef struct {
@@ -102,6 +104,8 @@ typedef struct {
   int window_title_stack_depth;
   char icon_name_stack[32][256];
   int icon_name_stack_depth;
+  char *uri_table[1024];
+  int uri_count;
 } Terminal;
 
 typedef enum {

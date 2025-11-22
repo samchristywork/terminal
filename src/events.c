@@ -1,5 +1,6 @@
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <time.h>
@@ -232,6 +233,21 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
   if (cell_y < 0) cell_y = 0;
   if (cell_y >= terminal->height) cell_y = terminal->height - 1;
   bool shift = (ev->state & ShiftMask) != 0;
+
+  if (ev->button == Button1 && (ev->state & ControlMask)) {
+    int abs_row = scr->scrollback.count - scr->scroll_offset + cell_y;
+    Term_Cell *lc = cell_at(scr, terminal, abs_row, cell_x);
+    if (lc && lc->attr.uri_idx > 0) {
+      const char *uri = terminal->uri_table[lc->attr.uri_idx - 1];
+      pid_t pid = fork();
+      if (pid == 0) {
+        setsid();
+        execlp("xdg-open", "xdg-open", uri, (char *)NULL);
+        _exit(1);
+      }
+      return;
+    }
+  }
 
   if (terminal->mouse_mode >= 1 && !shift) {
     int btn = -1;

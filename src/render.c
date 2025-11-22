@@ -391,7 +391,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
                           pixel_y + gui->char_ascent, (FcChar8 *)cell.data,
                           cell.length);
 
-        if (cell.attr.underline) {
+        if (cell.attr.underline || cell.attr.uri_idx > 0) {
           XSetForeground(gui->display, gui->gc, text_color);
           XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
                     pixel_y + gui->char_height - 1,
