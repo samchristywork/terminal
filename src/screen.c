@@ -132,8 +132,10 @@ void scroll_screen(Term_Screen *screen, int width, int height) {
       screen->lines[j].cells[k] = screen->lines[j + 1].cells[k];
     }
   }
+  Term_Cell blank = {0};
+  blank.attr.bg = screen->cursor.attr.bg;
   for (int k = 0; k < width; k++) {
-    memset(&screen->lines[bot].cells[k], 0, sizeof(Term_Cell));
+    screen->lines[bot].cells[k] = blank;
   }
   screen->scrolled = true;
 }

@@ -721,25 +721,27 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
 static void handle_erase(Term_Screen *screen, Term_TokenType type,
                          int width, int height) {
   Term_Cursor *cursor = &screen->cursor;
+  Term_Cell blank = {0};
+  blank.attr.bg = cursor->attr.bg;
   switch (type) {
   case TOKEN_ERASE_EOL:
     for (int j = cursor->x; j < width; j++)
-      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+      screen->lines[cursor->y].cells[j] = blank;
     break;
   case TOKEN_ERASE_SOL:
     for (int j = 0; j <= cursor->x; j++)
-      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+      screen->lines[cursor->y].cells[j] = blank;
     break;
   case TOKEN_ERASE_LINE:
     for (int j = 0; j < width; j++)
-      memset(&screen->lines[cursor->y].cells[j], 0, sizeof(Term_Cell));
+      screen->lines[cursor->y].cells[j] = blank;
     break;
   case TOKEN_ERASE_DOWN:
     for (int j = cursor->y; j < height; j++)
       for (int k = 0; k < width; k++) {
         if (j == cursor->y && k < cursor->x)
           continue;
-        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+        screen->lines[j].cells[k] = blank;
       }
     break;
   case TOKEN_ERASE_UP:
@@ -747,13 +749,13 @@ static void handle_erase(Term_Screen *screen, Term_TokenType type,
       for (int k = 0; k < width; k++) {
         if (j == cursor->y && k > cursor->x)
           continue;
-        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+        screen->lines[j].cells[k] = blank;
       }
     break;
   case TOKEN_ERASE_ALL:
     for (int j = 0; j < height; j++)
       for (int k = 0; k < width; k++)
-        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+        screen->lines[j].cells[k] = blank;
     break;
   default:
     break;
