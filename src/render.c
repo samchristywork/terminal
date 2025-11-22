@@ -112,6 +112,7 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
              color.color <= 107) {
     return gui->colors[color.color - 100 + 8];
   } else if (color.type == COLOR_256) {
+    static const int cube_levels[6] = {0, 95, 135, 175, 215, 255};
     int idx = color.color;
     unsigned long r, g, b;
 
@@ -119,9 +120,9 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
       return gui->colors[idx];
     } else if (idx < 232) {
       idx -= 16;
-      r = (idx / 36) * 51;
-      g = ((idx / 6) % 6) * 51;
-      b = (idx % 6) * 51;
+      r = cube_levels[idx / 36];
+      g = cube_levels[(idx / 6) % 6];
+      b = cube_levels[idx % 6];
       return (r << 16) | (g << 8) | b;
     } else {
       int gray = 8 + (idx - 232) * 10;
@@ -160,10 +161,11 @@ XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
         unsigned long r, g, b;
 
         if (idx < 232) {
+          static const int cube_levels[6] = {0, 95, 135, 175, 215, 255};
           int cube_idx = idx - 16;
-          r = (cube_idx / 36) * 51;
-          g = ((cube_idx / 6) % 6) * 51;
-          b = (cube_idx % 6) * 51;
+          r = cube_levels[cube_idx / 36];
+          g = cube_levels[(cube_idx / 6) % 6];
+          b = cube_levels[cube_idx % 6];
         } else {
           int gray = 8 + (idx - 232) * 10;
           r = g = b = gray;

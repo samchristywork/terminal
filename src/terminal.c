@@ -70,86 +70,74 @@ static void handle_field(Term_Cursor **cursor, int value) {
     (*cursor)->attr.blink = 0;
   } else if (value == 27) {
     (*cursor)->attr.reverse = 0;
+  } else if (value == 39) {
+    (*cursor)->attr.fg.color = 0;
+    (*cursor)->attr.fg.type = COLOR_DEFAULT;
+  } else if (value == 49) {
+    (*cursor)->attr.bg.color = 0;
+    (*cursor)->attr.bg.type = COLOR_DEFAULT;
   }
 }
 
 static void modify_cursor(Term_Cursor **cursor, Term_Token token) {
-  if (starts_with(token.value, token.length, "\x1b[38;5;")) {
-    if (token.length < 8)
-      return;
-    char num_str[16];
-    int num_len = token.length - 8;
-    if (num_len >= (int)sizeof(num_str))
-      num_len = (int)sizeof(num_str) - 1;
-    memcpy(num_str, &token.value[7], num_len);
-    num_str[num_len] = '\0';
-    int num = atoi(num_str);
-    if (num < 0 || num > 255)
-      return;
-    (*cursor)->attr.fg.type = COLOR_256;
-    (*cursor)->attr.fg.color = num;
-  } else if (starts_with(token.value, token.length, "\x1b[48;5;")) {
-    if (token.length < 8)
-      return;
-    char num_str[16];
-    int num_len = token.length - 8;
-    if (num_len >= (int)sizeof(num_str))
-      num_len = (int)sizeof(num_str) - 1;
-    memcpy(num_str, &token.value[7], num_len);
-    num_str[num_len] = '\0';
-    int num = atoi(num_str);
-    if (num < 0 || num > 255)
-      return;
-    (*cursor)->attr.bg.type = COLOR_256;
-    (*cursor)->attr.bg.color = num;
-  } else if (starts_with(token.value, token.length, "\x1b[38;2;")) {
-    char params[32];
-    int params_len = token.length - 8;
-    if (params_len <= 0 || params_len >= (int)sizeof(params))
-      return;
-    memcpy(params, &token.value[7], params_len);
-    params[params_len] = '\0';
-    int r, g, b;
-    if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
-      (*cursor)->attr.fg.type = COLOR_RGB;
-      (*cursor)->attr.fg.rgb.red = r < 0 ? 0 : (r > 255 ? 255 : r);
-      (*cursor)->attr.fg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
-      (*cursor)->attr.fg.rgb.blue = b < 0 ? 0 : (b > 255 ? 255 : b);
-    }
-  } else if (starts_with(token.value, token.length, "\x1b[48;2;")) {
-    char params[32];
-    int params_len = token.length - 8;
-    if (params_len <= 0 || params_len >= (int)sizeof(params))
-      return;
-    memcpy(params, &token.value[7], params_len);
-    params[params_len] = '\0';
-    int r, g, b;
-    if (sscanf(params, "%d;%d;%d", &r, &g, &b) == 3) {
-      (*cursor)->attr.bg.type = COLOR_RGB;
-      (*cursor)->attr.bg.rgb.red = r < 0 ? 0 : (r > 255 ? 255 : r);
-      (*cursor)->attr.bg.rgb.green = g < 0 ? 0 : (g > 255 ? 255 : g);
-      (*cursor)->attr.bg.rgb.blue = b < 0 ? 0 : (b > 255 ? 255 : b);
-    }
-  } else if (ends_with(token.value, token.length, 'm')) {
+  if (ends_with(token.value, token.length, 'm')) {
     if (token.length < 3)
       return;
     if (token.length == 3) {
       handle_field(cursor, 0);
       return;
     }
-    for (int i = 2; i < token.length - 1;) {
+
+    int fields[64];
+    int nf = 0;
+    for (int i = 2; i < token.length - 1 && nf < 64;) {
       int j = i;
       while (j < token.length - 1 && token.value[j] != ';')
         j++;
-      char num_str[16];
-      int num_len = j - i;
-      if (num_len >= (int)sizeof(num_str))
-        num_len = (int)sizeof(num_str) - 1;
-      memcpy(num_str, &token.value[i], num_len);
-      num_str[num_len] = '\0';
-      int num = atoi(num_str);
-      handle_field(cursor, num);
+      int len = j - i;
+      char buf[16];
+      if (len > 0 && len < (int)sizeof(buf)) {
+        memcpy(buf, token.value + i, len);
+        buf[len] = '\0';
+        fields[nf++] = atoi(buf);
+      } else {
+        fields[nf++] = 0;
+      }
       i = j + 1;
+    }
+
+    for (int i = 0; i < nf;) {
+      if ((fields[i] == 38 || fields[i] == 48) && i + 2 < nf &&
+          fields[i + 1] == 5) {
+        int idx = fields[i + 2];
+        if (idx >= 0 && idx <= 255) {
+          if (fields[i] == 38) {
+            (*cursor)->attr.fg.type = COLOR_256;
+            (*cursor)->attr.fg.color = idx;
+          } else {
+            (*cursor)->attr.bg.type = COLOR_256;
+            (*cursor)->attr.bg.color = idx;
+          }
+        }
+        i += 3;
+      } else if ((fields[i] == 38 || fields[i] == 48) && i + 4 < nf &&
+                 fields[i + 1] == 2) {
+        int r = fields[i + 2], g = fields[i + 3], b = fields[i + 4];
+        r = r < 0 ? 0 : (r > 255 ? 255 : r);
+        g = g < 0 ? 0 : (g > 255 ? 255 : g);
+        b = b < 0 ? 0 : (b > 255 ? 255 : b);
+        if (fields[i] == 38) {
+          (*cursor)->attr.fg.type = COLOR_RGB;
+          (*cursor)->attr.fg.rgb = (Term_RGB){r, g, b};
+        } else {
+          (*cursor)->attr.bg.type = COLOR_RGB;
+          (*cursor)->attr.bg.rgb = (Term_RGB){r, g, b};
+        }
+        i += 5;
+      } else {
+        handle_field(cursor, fields[i]);
+        i++;
+      }
     }
   } else if (ends_with(token.value, token.length, 'H') ||
              ends_with(token.value, token.length, 'f')) {
