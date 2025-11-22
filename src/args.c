@@ -62,6 +62,9 @@ static void load_config(Args *args) {
       int n = atoi(key + 5);
       if (n >= 0 && n <= 15)
         args->palette[n] = strtol(val, NULL, 16);
+    } else if (strcmp(key, "alpha") == 0) {
+      int v = atoi(val);
+      if (v >= 0 && v <= 255) args->alpha = v;
     }
   }
   fclose(f);
@@ -85,6 +88,7 @@ void print_usage(const char *program_name) {
   fprintf(stderr,
           "  --log-file FILE       Write logs to FILE instead of stdout\n");
   fprintf(stderr, "  --margin N            Set window margin in pixels (default: 10)\n");
+  fprintf(stderr, "  --alpha N             Window opacity 0-255 (default: 255, requires compositor)\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
 
@@ -96,6 +100,7 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->fg = -1;
   args->bg = -1;
   args->margin = 10;
+  args->alpha = 255;
   for (int i = 0; i < 16; i++)
     args->palette[i] = -1;
 
@@ -173,6 +178,17 @@ void parse_args(int argc, char *argv[], Args *args) {
       args->margin = atoi(argv[++i]);
       if (args->margin < 0) {
         fprintf(stderr, "Error: margin must be non-negative\n");
+        exit(1);
+      }
+    } else if (strcmp(argv[i], "--alpha") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --alpha requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      args->alpha = atoi(argv[++i]);
+      if (args->alpha < 0 || args->alpha > 255) {
+        fprintf(stderr, "Error: alpha must be 0-255\n");
         exit(1);
       }
     } else if (strcmp(argv[i], "--help") == 0) {

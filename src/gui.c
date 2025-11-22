@@ -27,6 +27,28 @@ int init_gui(GuiContext *gui, Args *args) {
   }
 
   gui->screen = DefaultScreen(gui->display);
+  gui->alpha = args->alpha;
+
+  // Select visual: use ARGB (32-bit) when transparency is requested
+  Visual *visual = DefaultVisual(gui->display, gui->screen);
+  Colormap colormap = DefaultColormap(gui->display, gui->screen);
+  int depth = DefaultDepth(gui->display, gui->screen);
+  gui->owns_colormap = false;
+
+  if (args->alpha < 255) {
+    XVisualInfo vinfo;
+    if (XMatchVisualInfo(gui->display, gui->screen, 32, TrueColor, &vinfo)) {
+      visual = vinfo.visual;
+      colormap = XCreateColormap(gui->display,
+                                 RootWindow(gui->display, gui->screen),
+                                 visual, AllocNone);
+      depth = 32;
+      gui->owns_colormap = true;
+    }
+  }
+  gui->visual = visual;
+  gui->colormap = colormap;
+
   gui->black = BlackPixel(gui->display, gui->screen);
   gui->white = WhitePixel(gui->display, gui->screen);
 
@@ -42,9 +64,15 @@ int init_gui(GuiContext *gui, Args *args) {
 
   gui->window_width = 800;
   gui->window_height = 600;
-  gui->window = XCreateSimpleWindow(
-      gui->display, RootWindow(gui->display, gui->screen), 100, 100,
-      gui->window_width, gui->window_height, 1, gui->white, gui->black);
+  XSetWindowAttributes xwa;
+  xwa.colormap = colormap;
+  xwa.background_pixel = 0;
+  xwa.border_pixel = 0;
+  gui->window = XCreateWindow(
+      gui->display, RootWindow(gui->display, gui->screen),
+      100, 100, gui->window_width, gui->window_height, 0,
+      depth, InputOutput, visual,
+      CWColormap | CWBackPixel | CWBorderPixel, &xwa);
 
   XSelectInput(gui->display, gui->window,
                ExposureMask | KeyPressMask | ButtonPressMask |
@@ -183,12 +211,18 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->char_ascent = gui->font->ascent;
 
   gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
-                                  gui->window_height,
-                                  DefaultDepth(gui->display, gui->screen));
+                                  gui->window_height, depth);
 
-  gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer,
-                                DefaultVisual(gui->display, gui->screen),
-                                DefaultColormap(gui->display, gui->screen));
+  gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer, visual, colormap);
+
+  gui->backbuffer_picture = None;
+  if (args->alpha < 255) {
+    XRenderPictFormat *fmt = XRenderFindVisualFormat(gui->display, visual);
+    if (fmt)
+      gui->backbuffer_picture = XRenderCreatePicture(gui->display,
+                                                     gui->backbuffer, fmt,
+                                                     0, NULL);
+  }
 
   gui->cursor_visible = true;
   clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
@@ -312,8 +346,8 @@ void cleanup_gui(GuiContext *gui) {
     waitpid(gui->child_pid, NULL, 0);
   }
 
-  Colormap colormap = DefaultColormap(gui->display, gui->screen);
-  Visual *visual = DefaultVisual(gui->display, gui->screen);
+  Visual *visual = gui->visual;
+  Colormap colormap = gui->colormap;
   for (int i = 0; i < 16; i++) {
     XftColorFree(gui->display, visual, colormap, &gui->xft_colors[i]);
   }
@@ -331,6 +365,9 @@ void cleanup_gui(GuiContext *gui) {
       XftColorFree(gui->display, visual, colormap, &gui->rgb_cache[i]);
   }
 
+  if (gui->backbuffer_picture)
+    XRenderFreePicture(gui->display, gui->backbuffer_picture);
+
   free(gui->selection_text);
 
   XftDrawDestroy(gui->xft_draw);
@@ -342,6 +379,8 @@ void cleanup_gui(GuiContext *gui) {
   XFreePixmap(gui->display, gui->backbuffer);
   XFreeGC(gui->display, gui->gc);
   XDestroyWindow(gui->display, gui->window);
+  if (gui->owns_colormap)
+    XFreeColormap(gui->display, colormap);
   XCloseDisplay(gui->display);
 }
 
@@ -449,8 +488,8 @@ int main(int argc, char *argv[]) {
       }
       if (terminal.fg_dirty) {
         unsigned long fg_val = terminal.osc_fg;
-        Colormap colormap = DefaultColormap(gui.display, gui.screen);
-        Visual *visual = DefaultVisual(gui.display, gui.screen);
+        Colormap colormap = gui.colormap;
+        Visual *visual = gui.visual;
         XColor color;
         color.red = ((fg_val >> 16) & 0xff) << 8;
         color.green = ((fg_val >> 8) & 0xff) << 8;
@@ -470,8 +509,8 @@ int main(int argc, char *argv[]) {
       }
       if (terminal.bg_dirty) {
         unsigned long bg_val = terminal.osc_bg;
-        Colormap colormap = DefaultColormap(gui.display, gui.screen);
-        Visual *visual = DefaultVisual(gui.display, gui.screen);
+        Colormap colormap = gui.colormap;
+        Visual *visual = gui.visual;
         XColor color;
         color.red = ((bg_val >> 16) & 0xff) << 8;
         color.green = ((bg_val >> 8) & 0xff) << 8;

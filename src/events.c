@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <X11/keysym.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
 
 #include "events.h"
 #include "log.h"
@@ -45,15 +46,23 @@ static void on_configure(GuiContext *gui, Terminal *terminal,
   gui->window_width = new_width;
   gui->window_height = new_height;
 
+  int depth = (gui->alpha < 255) ? 32 : DefaultDepth(gui->display, gui->screen);
   XFreePixmap(gui->display, gui->backbuffer);
   gui->backbuffer =
       XCreatePixmap(gui->display, gui->window, gui->window_width,
-                    gui->window_height, DefaultDepth(gui->display, gui->screen));
+                    gui->window_height, depth);
 
   XftDrawDestroy(gui->xft_draw);
   gui->xft_draw = XftDrawCreate(gui->display, gui->backbuffer,
-                                DefaultVisual(gui->display, gui->screen),
-                                DefaultColormap(gui->display, gui->screen));
+                                gui->visual, gui->colormap);
+
+  if (gui->backbuffer_picture) {
+    XRenderFreePicture(gui->display, gui->backbuffer_picture);
+    XRenderPictFormat *fmt = XRenderFindVisualFormat(gui->display, gui->visual);
+    gui->backbuffer_picture = fmt
+        ? XRenderCreatePicture(gui->display, gui->backbuffer, fmt, 0, NULL)
+        : None;
+  }
 
   int term_cols = (new_width - 2 * gui->margin) / gui->char_width;
   int term_rows = (new_height - 2 * gui->margin) / gui->char_height;

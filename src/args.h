@@ -10,6 +10,7 @@ typedef struct {
   long bg;          // -1 = default black
   long palette[16]; // -1 = use built-in default for that slot
   int margin;
+  int alpha;        // 0-255, 255 = fully opaque
 } Args;
 
 void parse_args(int argc, char *argv[], Args *args);

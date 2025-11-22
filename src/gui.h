@@ -4,6 +4,8 @@
 #include <X11/Xatom.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <time.h>
@@ -63,6 +65,11 @@ typedef struct {
   int last_click_x;
   int last_click_y;
   int margin;
+  int alpha;               // 0-255, 255 = fully opaque
+  Visual *visual;          // visual used for window/pixmap
+  Colormap colormap;       // colormap matching visual
+  bool owns_colormap;      // true if we created the colormap (must free)
+  Picture backbuffer_picture; // XRender picture for backbuffer (transparency)
 #define SEARCH_MAX_MATCHES 4096
   bool search_active;
   char search_query[256];
