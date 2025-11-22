@@ -297,6 +297,76 @@ void build_selection_text(GuiContext *gui, Terminal *terminal) {
   gui->selection_len = pos;
 }
 
+void run_search(GuiContext *gui, Terminal *terminal) {
+  gui->search_match_count = 0;
+  gui->search_current = -1;
+  if (gui->search_query_len == 0)
+    return;
+
+  Term_Screen *scr =
+      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+  Term_Scrollback *sb = &scr->scrollback;
+  int total_rows = sb->count + terminal->height;
+
+  for (int row = 0; row < total_rows; row++) {
+    char buf[4096];
+    int col_at_byte[4096];
+    int buf_len = 0;
+
+    for (int x = 0; x < terminal->width && buf_len < (int)sizeof(buf) - 7; x++) {
+      Term_Cell cell;
+      if (row < sb->count) {
+        int idx = (sb->head + row) % sb->capacity;
+        cell = (x < sb->widths[idx]) ? sb->lines[idx][x] : (Term_Cell){0};
+      } else {
+        cell = scr->lines[row - sb->count].cells[x];
+      }
+      for (int k = 0; k < cell.length && buf_len < (int)sizeof(buf) - 1; k++) {
+        col_at_byte[buf_len] = x;
+        buf[buf_len++] = cell.data[k];
+      }
+    }
+    buf[buf_len] = '\0';
+
+    const char *p = buf;
+    while (*p) {
+      const char *found = strstr(p, gui->search_query);
+      if (!found)
+        break;
+      int bs = found - buf;
+      int be = bs + gui->search_query_len - 1;
+      if (be >= buf_len)
+        be = buf_len - 1;
+      if (gui->search_match_count < SEARCH_MAX_MATCHES) {
+        gui->search_rows[gui->search_match_count] = row;
+        gui->search_start_cols[gui->search_match_count] =
+            (bs < buf_len) ? col_at_byte[bs] : 0;
+        gui->search_end_cols[gui->search_match_count] =
+            (be >= 0 && be < buf_len) ? col_at_byte[be] : 0;
+        gui->search_match_count++;
+      }
+      p = found + gui->search_query_len;
+    }
+  }
+
+  // Focus first match at or after the current scroll position
+  if (gui->search_match_count > 0) {
+    int first_visible = scr->scrollback.count - scr->scroll_offset;
+    gui->search_current = 0;
+    for (int m = 0; m < gui->search_match_count; m++) {
+      if (gui->search_rows[m] >= first_visible) {
+        gui->search_current = m;
+        break;
+      }
+    }
+    // Scroll to bring the focused match into view
+    int target = scr->scrollback.count - gui->search_rows[gui->search_current];
+    if (target < 0) target = 0;
+    if (target > scr->scrollback.count) target = scr->scrollback.count;
+    scr->scroll_offset = target;
+  }
+}
+
 void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
@@ -347,6 +417,24 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       unsigned long bg_color = gui->default_bg;
       if (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
+      }
+
+      if (gui->search_active) {
+        for (int m = 0; m < gui->search_match_count; m++) {
+          if (gui->search_rows[m] > combined) break;
+          if (gui->search_rows[m] == combined &&
+              gui->search_start_cols[m] <= x && x <= gui->search_end_cols[m]) {
+            Term_Color hc;
+            hc.type = COLOR_RGB;
+            if (m == gui->search_current) {
+              hc.rgb = (Term_RGB){255, 165, 0}; // orange: focused match
+            } else {
+              hc.rgb = (Term_RGB){160, 120, 0}; // dark gold: other matches
+            }
+            bg_color = get_color_pixel(gui, hc);
+            break;
+          }
+        }
       }
 
       bool is_cursor =
@@ -438,6 +526,28 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         }
       }
     }
+  }
+
+  if (gui->search_active) {
+    int bar_y = gui->window_height - gui->char_height - gui->margin;
+    Term_Color bar_bg = {.type = COLOR_RGB, .rgb = {255, 220, 50}};
+    XSetForeground(gui->display, gui->gc, get_color_pixel(gui, bar_bg));
+    XFillRectangle(gui->display, gui->backbuffer, gui->gc,
+                   0, bar_y, gui->window_width, gui->char_height + gui->margin);
+    char bar[400];
+    int blen;
+    if (gui->search_query_len == 0) {
+      blen = snprintf(bar, sizeof(bar), " /");
+    } else if (gui->search_match_count == 0) {
+      blen = snprintf(bar, sizeof(bar), " /%s  [no matches]", gui->search_query);
+    } else {
+      blen = snprintf(bar, sizeof(bar), " /%s  [%d/%d]",
+                      gui->search_query, gui->search_current + 1,
+                      gui->search_match_count);
+    }
+    XftDrawStringUtf8(gui->xft_draw, &gui->xft_colors[0], gui->font,
+                      gui->margin, bar_y + gui->char_ascent,
+                      (FcChar8 *)bar, blen > 0 ? blen : 0);
   }
 
   XCopyArea(gui->display, gui->backbuffer, gui->window, gui->gc, 0, 0,

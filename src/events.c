@@ -81,11 +81,62 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
 
   char buffer[32];
   KeySym keysym;
-  XLookupString(ev, buffer, sizeof(buffer), &keysym, NULL);
+  int buffer_len = XLookupString(ev, buffer, sizeof(buffer), &keysym, NULL);
 
   Term_Screen *scr =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   int max_scroll = scr->scrollback.count;
+
+  // Toggle search with Ctrl+Shift+F
+  if ((keysym == XK_f || keysym == XK_F) && (ev->state & ControlMask) && (ev->state & ShiftMask)) {
+    gui->search_active = !gui->search_active;
+    if (gui->search_active) {
+      gui->search_query_len = 0;
+      gui->search_query[0] = '\0';
+      gui->search_match_count = 0;
+      gui->search_current = -1;
+    }
+    draw_terminal(gui, terminal);
+    return;
+  }
+
+  if (gui->search_active) {
+    if (keysym == XK_Escape) {
+      gui->search_active = false;
+      gui->search_match_count = 0;
+    } else if (keysym == XK_Return || keysym == XK_KP_Enter) {
+      if (gui->search_match_count > 0) {
+        int dir = (ev->state & ShiftMask) ? -1 : 1;
+        gui->search_current =
+            (gui->search_current + dir + gui->search_match_count) %
+            gui->search_match_count;
+        int abs_row = gui->search_rows[gui->search_current];
+        int offset = scr->scrollback.count - abs_row;
+        if (offset < 0) offset = 0;
+        if (offset > max_scroll) offset = max_scroll;
+        scr->scroll_offset = offset;
+      }
+    } else if (keysym == XK_BackSpace) {
+      if (gui->search_query_len > 0) {
+        gui->search_query_len--;
+        while (gui->search_query_len > 0 &&
+               (gui->search_query[gui->search_query_len] & 0xC0) == 0x80)
+          gui->search_query_len--;
+        gui->search_query[gui->search_query_len] = '\0';
+        run_search(gui, terminal);
+      }
+    } else if (buffer_len > 0 && (unsigned char)buffer[0] >= 0x20) {
+      if (gui->search_query_len + buffer_len <
+          (int)sizeof(gui->search_query) - 1) {
+        memcpy(gui->search_query + gui->search_query_len, buffer, buffer_len);
+        gui->search_query_len += buffer_len;
+        gui->search_query[gui->search_query_len] = '\0';
+        run_search(gui, terminal);
+      }
+    }
+    draw_terminal(gui, terminal);
+    return;
+  }
 
   if (keysym == XK_Prior && (ev->state & ShiftMask)) {
     scr->scroll_offset += terminal->height;
@@ -97,12 +148,12 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     if (scr->scroll_offset < 0)
       scr->scroll_offset = 0;
     draw_terminal(gui, terminal);
-  } else if (keysym == XK_c && (ev->state & ControlMask) &&
+  } else if ((keysym == XK_c || keysym == XK_C) && (ev->state & ControlMask) &&
              (ev->state & ShiftMask)) {
     if (gui->has_selection)
       XSetSelectionOwner(gui->display, gui->atom_clipboard, gui->window,
                          CurrentTime);
-  } else if (keysym == XK_v && (ev->state & ControlMask) &&
+  } else if ((keysym == XK_v || keysym == XK_V) && (ev->state & ControlMask) &&
              (ev->state & ShiftMask)) {
     XConvertSelection(gui->display, gui->atom_clipboard, gui->atom_utf8_string,
                       gui->atom_xsel_data, gui->window, CurrentTime);

@@ -63,6 +63,15 @@ typedef struct {
   int last_click_x;
   int last_click_y;
   int margin;
+#define SEARCH_MAX_MATCHES 4096
+  bool search_active;
+  char search_query[256];
+  int search_query_len;
+  int search_rows[SEARCH_MAX_MATCHES];
+  int search_start_cols[SEARCH_MAX_MATCHES];
+  int search_end_cols[SEARCH_MAX_MATCHES];
+  int search_match_count;
+  int search_current; // -1 if no matches
 } GuiContext;
 
 int init_gui(GuiContext *gui, Args *args);
