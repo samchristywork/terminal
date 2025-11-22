@@ -4,6 +4,69 @@
 
 #include "args.h"
 
+static void strip(char *s) {
+  int len = strlen(s);
+  while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t' ||
+                     s[len - 1] == '\n' || s[len - 1] == '\r'))
+    s[--len] = '\0';
+}
+
+static char *ltrim(char *s) {
+  while (*s == ' ' || *s == '\t') s++;
+  return s;
+}
+
+static void load_config(Args *args) {
+  const char *home = getenv("HOME");
+  if (!home) return;
+
+  char path[512];
+  snprintf(path, sizeof(path), "%s/.config/terminal/config", home);
+
+  FILE *f = fopen(path, "r");
+  if (!f) return;
+
+  char line[512];
+  while (fgets(line, sizeof(line), f)) {
+    char *p = ltrim(line);
+    if (*p == '#' || *p == '\0' || *p == '\n') continue;
+
+    char *eq = strchr(p, '=');
+    if (!eq) continue;
+
+    *eq = '\0';
+    char *key = p;
+    strip(key);
+    char *val = ltrim(eq + 1);
+    strip(val);
+    if (!*key || !*val) continue;
+
+    if (strcmp(key, "font-size") == 0) {
+      int v = atoi(val);
+      if (v > 0) args->font_size = v;
+    } else if (strcmp(key, "scrollback") == 0) {
+      int v = atoi(val);
+      if (v > 0) args->scrollback = v;
+    } else if (strcmp(key, "margin") == 0) {
+      int v = atoi(val);
+      if (v >= 0) args->margin = v;
+    } else if (strcmp(key, "font") == 0) {
+      args->font = strdup(val);
+    } else if (strcmp(key, "fg") == 0) {
+      args->fg = strtol(val, NULL, 16);
+    } else if (strcmp(key, "bg") == 0) {
+      args->bg = strtol(val, NULL, 16);
+    } else if (strcmp(key, "log-file") == 0) {
+      args->log_file = strdup(val);
+    } else if (strncmp(key, "color", 5) == 0) {
+      int n = atoi(key + 5);
+      if (n >= 0 && n <= 15)
+        args->palette[n] = strtol(val, NULL, 16);
+    }
+  }
+  fclose(f);
+}
+
 void print_usage(const char *program_name) {
   fprintf(stderr, "Usage: %s [OPTIONS]\n", program_name);
   fprintf(stderr, "Options:\n");
@@ -35,6 +98,8 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->margin = 10;
   for (int i = 0; i < 16; i++)
     args->palette[i] = -1;
+
+  load_config(args);
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--scrollback") == 0) {
