@@ -780,6 +780,15 @@ static void handle_erase(Term_Screen *screen, Term_TokenType type, int width,
       for (int k = 0; k < width; k++)
         screen->lines[j].cells[k] = blank;
     break;
+  case TOKEN_ERASE_SCROLLBACK: {
+    Term_Scrollback *sb = &screen->scrollback;
+    for (int i = 0; i < sb->count; i++)
+      free(sb->lines[(sb->head + i) % sb->capacity]);
+    sb->count = 0;
+    sb->head = 0;
+    screen->scroll_offset = 0;
+    break;
+  }
   default:
     break;
   }
