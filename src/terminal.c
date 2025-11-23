@@ -954,6 +954,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   }
 
   Term_Tokens *tokens = tokenize(text, combined_len);
+  if (!tokens) {
+    free(combined);
+    return;
+  }
   int width = terminal->dims.width;
   int height = terminal->dims.height;
 

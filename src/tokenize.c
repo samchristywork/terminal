@@ -105,7 +105,13 @@ bool ends_with(const char *str, int length, char suffix) {
 
 Term_Tokens *tokenize(const char *text, int length) {
   Term_Tokens *tokens = (Term_Tokens *)malloc(sizeof(Term_Tokens));
+  if (!tokens)
+    return NULL;
   tokens->tokens = (Term_Token *)malloc(128 * sizeof(Term_Token));
+  if (!tokens->tokens) {
+    free(tokens);
+    return NULL;
+  }
   tokens->count = 0;
 
   for (int i = 0; i < length; i++) {
