@@ -21,24 +21,25 @@ void token_repr(const Term_Token *t, char *buf, int bufsize) {
   buf[out] = '\0';
 }
 
-void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
+bool add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
                int start_index, int length) {
   if (tokens->count % 128 == 0) {
     Term_Token *new_tokens = (Term_Token *)realloc(
         tokens->tokens, (tokens->count + 128) * sizeof(Term_Token));
     if (!new_tokens)
-      return;
+      return false;
     tokens->tokens = new_tokens;
   }
   char *buf = malloc(length + 1);
   if (!buf)
-    return;
+    return false;
   memcpy(buf, &value[start_index], length);
   buf[length] = '\0';
   Term_Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
   token->length = length;
   token->value = buf;
+  return true;
 }
 
 bool is_csi_code(const char *text, int length, int index, int *code_length) {
@@ -113,70 +114,71 @@ Term_Tokens *tokenize(const char *text, int length) {
     return NULL;
   }
   tokens->count = 0;
+  bool ok = true;
 
   for (int i = 0; i < length; i++) {
     int len = 0;
     if (is_osc_sequence(text, length, i, &len)) {
-      add_token(tokens, TOKEN_OSC, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_OSC, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\n", &len)) {
-      add_token(tokens, TOKEN_NEWLINE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_NEWLINE, text, i, len);
     } else if (matches(text, length, i, "\r", &len)) {
-      add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CARRIAGE_RETURN, text, i, len);
     } else if (matches(text, length, i, "\b", &len) ||
                (i < length && (unsigned char)text[i] == 0x7f)) {
-      add_token(tokens, TOKEN_BACKSPACE, text, i, 1);
+      ok = ok && add_token(tokens, TOKEN_BACKSPACE, text, i, 1);
     } else if (matches(text, length, i, "\x1b[J", &len)) {
-      add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
     } else if (matches(text, length, i, "\x1b[0J", &len)) {
-      add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_DOWN, text, i, len);
     } else if (matches(text, length, i, "\x1b[1J", &len)) {
-      add_token(tokens, TOKEN_ERASE_UP, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_UP, text, i, len);
     } else if (matches(text, length, i, "\x1b[2J", &len)) {
-      add_token(tokens, TOKEN_ERASE_ALL, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_ALL, text, i, len);
     } else if (matches(text, length, i, "\x1b[3J", &len)) {
-      add_token(tokens, TOKEN_ERASE_SCROLLBACK, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_SCROLLBACK, text, i, len);
     } else if (matches(text, length, i, "\x1b[K", &len)) {
-      add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
     } else if (matches(text, length, i, "\x1b[0K", &len)) {
-      add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_EOL, text, i, len);
     } else if (matches(text, length, i, "\x1b[1K", &len)) {
-      add_token(tokens, TOKEN_ERASE_SOL, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_SOL, text, i, len);
     } else if (matches(text, length, i, "\x1b[2K", &len)) {
-      add_token(tokens, TOKEN_ERASE_LINE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ERASE_LINE, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049h", &len)) {
-      add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_ALT_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\x1b[?1049l", &len)) {
-      add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_MAIN_SCREEN, text, i, len);
     } else if (matches(text, length, i, "\x1b[?25l", &len)) {
-      add_token(tokens, TOKEN_CURSOR_HIDE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CURSOR_HIDE, text, i, len);
     } else if (matches(text, length, i, "\x1b[?25h", &len)) {
-      add_token(tokens, TOKEN_CURSOR_SHOW, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CURSOR_SHOW, text, i, len);
     } else if (matches(text, length, i, "\x1b[?2004h", &len)) {
-      add_token(tokens, TOKEN_BRACKETED_PASTE_ON, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_BRACKETED_PASTE_ON, text, i, len);
     } else if (matches(text, length, i, "\x1b[?2004l", &len)) {
-      add_token(tokens, TOKEN_BRACKETED_PASTE_OFF, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_BRACKETED_PASTE_OFF, text, i, len);
     } else if (matches(text, length, i,
                        "\x1b"
                        "7",
                        &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i,
                        "\x1b"
                        "8",
                        &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i,
                        "\x1b"
                        "M",
                        &len)) {
-      add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_REVERSE_INDEX, text, i, len);
     } else if (matches(text, length, i,
                        "\x1b"
                        "c",
                        &len)) {
-      add_token(tokens, TOKEN_FULL_RESET, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_FULL_RESET, text, i, len);
     } else if (i + 1 < length && text[i] == '\x1b' &&
                (text[i + 1] == '=' || text[i + 1] == '>')) {
       len = 2; // application/normal keypad mode
@@ -185,13 +187,13 @@ Term_Tokens *tokenize(const char *text, int length) {
                 text[i + 1] == '*' || text[i + 1] == '+')) {
       len = 3; // character set designation (e.g., \x1b(B)
     } else if (is_osc_sequence(text, length, i, &len)) {
-      add_token(tokens, TOKEN_OSC, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_OSC, text, i, len);
     } else if (is_csi_code(text, length, i, &len)) {
-      add_token(tokens, TOKEN_CSI_CODE, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_CSI_CODE, text, i, len);
     } else if (matches(text, length, i, "\t", &len)) {
-      add_token(tokens, TOKEN_TAB, text, i, len);
+      ok = ok && add_token(tokens, TOKEN_TAB, text, i, len);
     } else if (text[i] == '\x07') {
-      add_token(tokens, TOKEN_BEL, text, i, 1);
+      ok = ok && add_token(tokens, TOKEN_BEL, text, i, 1);
       len = 1;
     } else {
       int start = i;
@@ -216,6 +218,10 @@ Term_Tokens *tokenize(const char *text, int length) {
     i += len - 1;
   }
 
+  if (!ok) {
+    free_tokens(tokens);
+    return NULL;
+  }
   return tokens;
 }
 
