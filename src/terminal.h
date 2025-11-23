@@ -181,8 +181,7 @@ typedef enum {
 
 typedef struct {
   Term_TokenType type;
-  // TODO: handle longer sequences
-  char value[256];
+  char *value;
   int length;
 } Term_Token;
 

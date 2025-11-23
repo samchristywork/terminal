@@ -1034,7 +1034,6 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     }
   }
 
-  free(tokens->tokens);
-  free(tokens);
+  free_tokens(tokens);
   free(combined);
 }

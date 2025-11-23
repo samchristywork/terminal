@@ -15,6 +15,7 @@ bool matches(const char *text, int length, int index, const char *pattern,
 bool starts_with(const char *str, int length, const char *prefix);
 bool ends_with(const char *str, int length, char suffix);
 Term_Tokens *tokenize(const char *text, int length);
+void free_tokens(Term_Tokens *tokens);
 void print_token(Term_Token t);
 
 #endif

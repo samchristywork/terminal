@@ -30,13 +30,15 @@ void add_token(Term_Tokens *tokens, Term_TokenType type, const char *value,
       return;
     tokens->tokens = new_tokens;
   }
-  if (length > 255)
-    length = 255;
+  char *buf = malloc(length + 1);
+  if (!buf)
+    return;
+  memcpy(buf, &value[start_index], length);
+  buf[length] = '\0';
   Term_Token *token = &tokens->tokens[tokens->count++];
   token->type = type;
   token->length = length;
-  memcpy(token->value, &value[start_index], length);
-  token->value[length] = '\0';
+  token->value = buf;
 }
 
 bool is_csi_code(const char *text, int length, int index, int *code_length) {
@@ -199,9 +201,7 @@ Term_Tokens *tokenize(const char *text, int length) {
       }
       len = i - start;
       if (len > 0) {
-        for (int k = 0; k < len; k += 255)
-          add_token(tokens, TOKEN_TEXT, text, start + k,
-                    len - k < 255 ? len - k : 255);
+        add_token(tokens, TOKEN_TEXT, text, start, len);
       } else {
         len = 1; // skip unrecognised byte; prevent i from decrementing
       }
@@ -211,6 +211,13 @@ Term_Tokens *tokenize(const char *text, int length) {
   }
 
   return tokens;
+}
+
+void free_tokens(Term_Tokens *tokens) {
+  for (int i = 0; i < tokens->count; i++)
+    free(tokens->tokens[i].value);
+  free(tokens->tokens);
+  free(tokens);
 }
 
 void print_token(Term_Token t) {
