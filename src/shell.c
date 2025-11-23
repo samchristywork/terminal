@@ -59,9 +59,9 @@ void init_shell(GuiContext *gui, int cols, int rows) {
     int flags = fcntl(master, F_GETFL, 0);
     fcntl(master, F_SETFL, flags | O_NONBLOCK);
 
-    gui->pipe_fd = master;
-    gui->input_fd = -1;
-    gui->child_pid = pid;
+    gui->process.pipe_fd = master;
+    gui->process.input_fd = -1;
+    gui->process.child_pid = pid;
     LOG_INFO_MSG("Shell subprocess started with PID %d", pid);
   }
 }
@@ -70,7 +70,7 @@ void read_shell_output(GuiContext *gui, Terminal *terminal) {
   char buffer[4096];
   ssize_t bytes_read;
 
-  while ((bytes_read = read(gui->pipe_fd, buffer, sizeof(buffer))) > 0) {
+  while ((bytes_read = read(gui->process.pipe_fd, buffer, sizeof(buffer))) > 0) {
     write_terminal(terminal, buffer, bytes_read);
   }
 }

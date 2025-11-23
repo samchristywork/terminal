@@ -4,10 +4,10 @@
 #include "render.h"
 
 void init_colors(GuiContext *gui, Args *args) {
-  Colormap colormap = gui->colormap;
+  Colormap colormap = gui->x11.colormap;
   XColor color;
   XRenderColor xrender_color;
-  Visual *visual = gui->visual;
+  Visual *visual = gui->x11.visual;
 
   unsigned long color_values[] = {
       0x000000, // black
@@ -39,33 +39,33 @@ void init_colors(GuiContext *gui, Args *args) {
     color.blue = (color_values[i] & 0xff) << 8;
     color.flags = DoRed | DoGreen | DoBlue;
 
-    if (XAllocColor(gui->display, colormap, &color)) {
-      gui->colors[i] = color.pixel;
+    if (XAllocColor(gui->x11.display, colormap, &color)) {
+      gui->color.colors[i] = color.pixel;
     } else {
-      gui->colors[i] = (i < 8) ? gui->black : gui->white;
+      gui->color.colors[i] = (i < 8) ? gui->color.black : gui->color.white;
     }
 
     xrender_color.red = color.red;
     xrender_color.green = color.green;
     xrender_color.blue = color.blue;
     xrender_color.alpha = 0xffff;
-    XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
-                       &gui->xft_colors[i]);
+    XftColorAllocValue(gui->x11.display, visual, colormap, &xrender_color,
+                       &gui->color.xft_colors[i]);
   }
 
   xrender_color.red = 0xffff;
   xrender_color.green = 0xffff;
   xrender_color.blue = 0xffff;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
-                     &gui->xft_white);
+  XftColorAllocValue(gui->x11.display, visual, colormap, &xrender_color,
+                     &gui->color.xft_white);
 
   xrender_color.red = 0;
   xrender_color.green = 0;
   xrender_color.blue = 0;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
-                     &gui->xft_black);
+  XftColorAllocValue(gui->x11.display, visual, colormap, &xrender_color,
+                     &gui->color.xft_black);
 
   unsigned long fg_val = (args->fg != -1) ? (unsigned long)args->fg : 0xffffff;
   unsigned long bg_val = (args->bg != -1) ? (unsigned long)args->bg : 0x000000;
@@ -74,50 +74,50 @@ void init_colors(GuiContext *gui, Args *args) {
   color.green = ((fg_val >> 8) & 0xff) << 8;
   color.blue = (fg_val & 0xff) << 8;
   color.flags = DoRed | DoGreen | DoBlue;
-  gui->default_fg =
-      XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->white;
+  gui->color.default_fg =
+      XAllocColor(gui->x11.display, colormap, &color) ? color.pixel : gui->color.white;
 
   color.red = ((bg_val >> 16) & 0xff) << 8;
   color.green = ((bg_val >> 8) & 0xff) << 8;
   color.blue = (bg_val & 0xff) << 8;
   color.flags = DoRed | DoGreen | DoBlue;
-  gui->default_bg =
-      XAllocColor(gui->display, colormap, &color) ? color.pixel : gui->black;
+  gui->color.default_bg =
+      XAllocColor(gui->x11.display, colormap, &color) ? color.pixel : gui->color.black;
 
   xrender_color.red = ((fg_val >> 16) & 0xff) << 8;
   xrender_color.green = ((fg_val >> 8) & 0xff) << 8;
   xrender_color.blue = (fg_val & 0xff) << 8;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
-                     &gui->xft_default_fg);
+  XftColorAllocValue(gui->x11.display, visual, colormap, &xrender_color,
+                     &gui->color.xft_default_fg);
 
   xrender_color.red = ((bg_val >> 16) & 0xff) << 8;
   xrender_color.green = ((bg_val >> 8) & 0xff) << 8;
   xrender_color.blue = (bg_val & 0xff) << 8;
   xrender_color.alpha = 0xffff;
-  XftColorAllocValue(gui->display, visual, colormap, &xrender_color,
-                     &gui->xft_default_bg);
+  XftColorAllocValue(gui->x11.display, visual, colormap, &xrender_color,
+                     &gui->color.xft_default_bg);
 }
 
 unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
   if (color.type == COLOR_DEFAULT && color.color >= 30 && color.color <= 37) {
-    return gui->colors[color.color - 30];
+    return gui->color.colors[color.color - 30];
   } else if (color.type == COLOR_BRIGHT && color.color >= 90 &&
              color.color <= 97) {
-    return gui->colors[color.color - 90 + 8];
+    return gui->color.colors[color.color - 90 + 8];
   } else if (color.type == COLOR_DEFAULT && color.color >= 40 &&
              color.color <= 47) {
-    return gui->colors[color.color - 40];
+    return gui->color.colors[color.color - 40];
   } else if (color.type == COLOR_BRIGHT && color.color >= 100 &&
              color.color <= 107) {
-    return gui->colors[color.color - 100 + 8];
+    return gui->color.colors[color.color - 100 + 8];
   } else if (color.type == COLOR_256) {
     static const int cube_levels[6] = {0, 95, 135, 175, 215, 255};
     int idx = color.color;
     unsigned long r, g, b;
 
     if (idx < 16) {
-      return gui->colors[idx];
+      return gui->color.colors[idx];
     } else if (idx < 232) {
       idx -= 16;
       r = cube_levels[idx / 36];
@@ -133,30 +133,30 @@ unsigned long get_color_pixel(GuiContext *gui, Term_Color color) {
            ((unsigned long)color.rgb.green << 8) |
            (unsigned long)color.rgb.blue;
   }
-  return gui->white;
+  return gui->color.white;
 }
 
 XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
   if (color.type == COLOR_DEFAULT && color.color >= 30 && color.color <= 37) {
-    return &gui->xft_colors[color.color - 30];
+    return &gui->color.xft_colors[color.color - 30];
   } else if (color.type == COLOR_BRIGHT && color.color >= 90 &&
              color.color <= 97) {
-    return &gui->xft_colors[color.color - 90 + 8];
+    return &gui->color.xft_colors[color.color - 90 + 8];
   } else if (color.type == COLOR_DEFAULT && color.color >= 40 &&
              color.color <= 47) {
-    return &gui->xft_colors[color.color - 40];
+    return &gui->color.xft_colors[color.color - 40];
   } else if (color.type == COLOR_BRIGHT && color.color >= 100 &&
              color.color <= 107) {
-    return &gui->xft_colors[color.color - 100 + 8];
+    return &gui->color.xft_colors[color.color - 100 + 8];
   } else if (color.type == COLOR_256) {
     int idx = color.color;
 
     if (idx >= 0 && idx < 256) {
       if (idx < 16) {
-        return &gui->xft_colors[idx];
+        return &gui->color.xft_colors[idx];
       }
 
-      if (!gui->xft_color_cached[idx]) {
+      if (!gui->color.xft_color_cached[idx]) {
         XRenderColor xrender_color;
         unsigned long r, g, b;
 
@@ -175,43 +175,43 @@ XftColor *get_xft_color(GuiContext *gui, Term_Color color) {
         xrender_color.green = g << 8;
         xrender_color.blue = b << 8;
         xrender_color.alpha = 0xffff;
-        XftColorAllocValue(gui->display, gui->visual, gui->colormap,
-                           &xrender_color, &gui->xft_color_cache[idx]);
-        gui->xft_color_cached[idx] = true;
+        XftColorAllocValue(gui->x11.display, gui->x11.visual, gui->x11.colormap,
+                           &xrender_color, &gui->color.xft_color_cache[idx]);
+        gui->color.xft_color_cached[idx] = true;
       }
-      return &gui->xft_color_cache[idx];
+      return &gui->color.xft_color_cache[idx];
     }
   } else if (color.type == COLOR_RGB) {
     int key = (color.rgb.red << 16) | (color.rgb.green << 8) | color.rgb.blue;
     for (int i = 0; i < 64; i++) {
-      if (gui->rgb_cache_valid[i] && gui->rgb_cache_keys[i] == key)
-        return &gui->rgb_cache[i];
+      if (gui->color.rgb_cache_valid[i] && gui->color.rgb_cache_keys[i] == key)
+        return &gui->color.rgb_cache[i];
     }
-    int slot = gui->rgb_cache_next;
-    gui->rgb_cache_next = (gui->rgb_cache_next + 1) % 64;
-    if (gui->rgb_cache_valid[slot]) {
-      XftColorFree(gui->display, gui->visual, gui->colormap,
-                   &gui->rgb_cache[slot]);
+    int slot = gui->color.rgb_cache_next;
+    gui->color.rgb_cache_next = (gui->color.rgb_cache_next + 1) % 64;
+    if (gui->color.rgb_cache_valid[slot]) {
+      XftColorFree(gui->x11.display, gui->x11.visual, gui->x11.colormap,
+                   &gui->color.rgb_cache[slot]);
     }
     XRenderColor xrender_color;
     xrender_color.red = (unsigned short)(color.rgb.red << 8);
     xrender_color.green = (unsigned short)(color.rgb.green << 8);
     xrender_color.blue = (unsigned short)(color.rgb.blue << 8);
     xrender_color.alpha = 0xffff;
-    XftColorAllocValue(gui->display, gui->visual, gui->colormap, &xrender_color,
-                       &gui->rgb_cache[slot]);
-    gui->rgb_cache_keys[slot] = key;
-    gui->rgb_cache_valid[slot] = true;
-    return &gui->rgb_cache[slot];
+    XftColorAllocValue(gui->x11.display, gui->x11.visual, gui->x11.colormap, &xrender_color,
+                       &gui->color.rgb_cache[slot]);
+    gui->color.rgb_cache_keys[slot] = key;
+    gui->color.rgb_cache_valid[slot] = true;
+    return &gui->color.rgb_cache[slot];
   }
-  return &gui->xft_white;
+  return &gui->color.xft_white;
 }
 
 static bool cell_in_selection(GuiContext *gui, int x, int y) {
-  if (!gui->has_selection)
+  if (!gui->selection.has_selection)
     return false;
-  int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
-  int bx = gui->sel_cur_x, by = gui->sel_cur_y;
+  int ax = gui->selection.sel_anchor_x, ay = gui->selection.sel_anchor_y;
+  int bx = gui->selection.sel_cur_x, by = gui->selection.sel_cur_y;
   int start_x, start_y, end_x, end_y;
   if (ay < by || (ay == by && ax <= bx)) {
     start_x = ax;
@@ -234,14 +234,14 @@ static bool cell_in_selection(GuiContext *gui, int x, int y) {
 }
 
 void build_selection_text(GuiContext *gui, Terminal *terminal) {
-  free(gui->selection_text);
-  gui->selection_text = NULL;
-  gui->selection_len = 0;
-  if (!gui->has_selection)
+  free(gui->selection.selection_text);
+  gui->selection.selection_text = NULL;
+  gui->selection.selection_len = 0;
+  if (!gui->selection.has_selection)
     return;
 
-  int ax = gui->sel_anchor_x, ay = gui->sel_anchor_y;
-  int bx = gui->sel_cur_x, by = gui->sel_cur_y;
+  int ax = gui->selection.sel_anchor_x, ay = gui->selection.sel_anchor_y;
+  int bx = gui->selection.sel_cur_x, by = gui->selection.sel_cur_y;
   int start_x, start_y, end_x, end_y;
   if (ay < by || (ay == by && ax <= bx)) {
     start_x = ax;
@@ -291,14 +291,14 @@ void build_selection_text(GuiContext *gui, Terminal *terminal) {
   }
 
   buf[pos] = '\0';
-  gui->selection_text = buf;
-  gui->selection_len = pos;
+  gui->selection.selection_text = buf;
+  gui->selection.selection_len = pos;
 }
 
 void run_search(GuiContext *gui, Terminal *terminal) {
-  gui->search_match_count = 0;
-  gui->search_current = -1;
-  if (gui->search_query_len == 0)
+  gui->search.search_match_count = 0;
+  gui->search.search_current = -1;
+  if (gui->search.search_query_len == 0)
     return;
 
   Term_Screen *scr =
@@ -329,37 +329,37 @@ void run_search(GuiContext *gui, Terminal *terminal) {
 
     const char *p = buf;
     while (*p) {
-      const char *found = strstr(p, gui->search_query);
+      const char *found = strstr(p, gui->search.search_query);
       if (!found)
         break;
       int bs = found - buf;
-      int be = bs + gui->search_query_len - 1;
+      int be = bs + gui->search.search_query_len - 1;
       if (be >= buf_len)
         be = buf_len - 1;
-      if (gui->search_match_count < SEARCH_MAX_MATCHES) {
-        gui->search_rows[gui->search_match_count] = row;
-        gui->search_start_cols[gui->search_match_count] =
+      if (gui->search.search_match_count < SEARCH_MAX_MATCHES) {
+        gui->search.search_rows[gui->search.search_match_count] = row;
+        gui->search.search_start_cols[gui->search.search_match_count] =
             (bs < buf_len) ? col_at_byte[bs] : 0;
-        gui->search_end_cols[gui->search_match_count] =
+        gui->search.search_end_cols[gui->search.search_match_count] =
             (be >= 0 && be < buf_len) ? col_at_byte[be] : 0;
-        gui->search_match_count++;
+        gui->search.search_match_count++;
       }
-      p = found + gui->search_query_len;
+      p = found + gui->search.search_query_len;
     }
   }
 
   // Focus first match at or after the current scroll position
-  if (gui->search_match_count > 0) {
+  if (gui->search.search_match_count > 0) {
     int first_visible = scr->scrollback.count - scr->scroll_offset;
-    gui->search_current = 0;
-    for (int m = 0; m < gui->search_match_count; m++) {
-      if (gui->search_rows[m] >= first_visible) {
-        gui->search_current = m;
+    gui->search.search_current = 0;
+    for (int m = 0; m < gui->search.search_match_count; m++) {
+      if (gui->search.search_rows[m] >= first_visible) {
+        gui->search.search_current = m;
         break;
       }
     }
     // Scroll to bring the focused match into view
-    int target = scr->scrollback.count - gui->search_rows[gui->search_current];
+    int target = scr->scrollback.count - gui->search.search_rows[gui->search.search_current];
     if (target < 0)
       target = 0;
     if (target > scr->scrollback.count)
@@ -369,13 +369,13 @@ void run_search(GuiContext *gui, Terminal *terminal) {
 }
 
 // Fill a rectangle on the backbuffer using XRender (for transparency) or
-// XFillRectangle. When gui->alpha < 255, all bg fills go through XRender so
+// XFillRectangle. When gui->surface.alpha < 255, all bg fills go through XRender so
 // the alpha channel in the ARGB pixmap is set correctly for the compositor.
 static void bg_fill(GuiContext *gui, int x, int y, int w, int h,
                     unsigned long rgb, int alpha) {
-  if (gui->alpha == 255) {
-    XSetForeground(gui->display, gui->gc, rgb);
-    XFillRectangle(gui->display, gui->backbuffer, gui->gc, x, y, w, h);
+  if (gui->surface.alpha == 255) {
+    XSetForeground(gui->x11.display, gui->x11.gc, rgb);
+    XFillRectangle(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, x, y, w, h);
   } else {
     XRenderColor xrc = {
         .red = (unsigned short)(((rgb >> 16) & 0xFF) * 257),
@@ -383,7 +383,7 @@ static void bg_fill(GuiContext *gui, int x, int y, int w, int h,
         .blue = (unsigned short)((rgb & 0xFF) * 257),
         .alpha = (unsigned short)(alpha * 257),
     };
-    XRenderFillRectangle(gui->display, PictOpSrc, gui->backbuffer_picture, &xrc,
+    XRenderFillRectangle(gui->x11.display, PictOpSrc, gui->surface.backbuffer_picture, &xrc,
                          x, y, w, h);
   }
 }
@@ -391,7 +391,7 @@ static void bg_fill(GuiContext *gui, int x, int y, int w, int h,
 // When using an ARGB visual, XFillRectangle/XDrawLine foreground pixels must
 // have 0xFF in the alpha byte or they render as transparent.
 static unsigned long opaque_pixel(GuiContext *gui, unsigned long pixel) {
-  return (gui->alpha < 255) ? (0xFF000000UL | (pixel & 0xFFFFFF)) : pixel;
+  return (gui->surface.alpha < 255) ? (0xFF000000UL | (pixel & 0xFFFFFF)) : pixel;
 }
 
 void draw_terminal(GuiContext *gui, Terminal *terminal) {
@@ -399,19 +399,19 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
 
   // Clear entire backbuffer: transparent bg, or opaque fg during bell flash
-  if (gui->bell_flash) {
-    bg_fill(gui, 0, 0, gui->window_width, gui->window_height, gui->default_fg,
+  if (gui->bell.bell_flash) {
+    bg_fill(gui, 0, 0, gui->surface.window_width, gui->surface.window_height, gui->color.default_fg,
             255);
   } else {
-    bg_fill(gui, 0, 0, gui->window_width, gui->window_height, gui->default_bg,
-            gui->alpha);
+    bg_fill(gui, 0, 0, gui->surface.window_width, gui->surface.window_height, gui->color.default_bg,
+            gui->surface.alpha);
   }
 
   int scroll_offset = term_screen->scroll_offset;
   Term_Scrollback *sb = &term_screen->scrollback;
 
   for (int y = 0; y < terminal->height; y++) {
-    if (gui->margin >= 4) {
+    if (gui->surface.margin >= 4) {
       int combined_row = sb->count - scroll_offset + y;
       int oldest = sb->count - sb->capacity;
       for (int m = 0; m < terminal->shell_mark_count; m++) {
@@ -421,11 +421,11 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         if (mark < oldest)
           continue;
         if (mark == combined_row) {
-          XSetForeground(gui->display, gui->gc,
-                         opaque_pixel(gui, gui->colors[2]));
-          XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0,
-                         y * gui->char_height + gui->margin, 3,
-                         gui->char_height);
+          XSetForeground(gui->x11.display, gui->x11.gc,
+                         opaque_pixel(gui, gui->color.colors[2]));
+          XFillRectangle(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, 0,
+                         y * gui->fonts.char_height + gui->surface.margin, 3,
+                         gui->fonts.char_height);
           break;
         }
       }
@@ -446,26 +446,26 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       if (cell.wide_cont)
         continue;
 
-      int pixel_x = x * gui->char_width + gui->margin;
-      int pixel_y = y * (gui->char_height) + gui->margin;
-      int draw_width = cell.wide ? gui->char_width * 2 : gui->char_width;
+      int pixel_x = x * gui->fonts.char_width + gui->surface.margin;
+      int pixel_y = y * (gui->fonts.char_height) + gui->surface.margin;
+      int draw_width = cell.wide ? gui->fonts.char_width * 2 : gui->fonts.char_width;
 
       bool is_default_bg =
           (cell.attr.bg.type == COLOR_DEFAULT && cell.attr.bg.color == 0);
-      unsigned long bg_color = gui->default_bg;
+      unsigned long bg_color = gui->color.default_bg;
       if (!is_default_bg) {
         bg_color = get_color_pixel(gui, cell.attr.bg);
       }
 
-      if (gui->search_active) {
-        for (int m = 0; m < gui->search_match_count; m++) {
-          if (gui->search_rows[m] > combined)
+      if (gui->search.search_active) {
+        for (int m = 0; m < gui->search.search_match_count; m++) {
+          if (gui->search.search_rows[m] > combined)
             break;
-          if (gui->search_rows[m] == combined &&
-              gui->search_start_cols[m] <= x && x <= gui->search_end_cols[m]) {
+          if (gui->search.search_rows[m] == combined &&
+              gui->search.search_start_cols[m] <= x && x <= gui->search.search_end_cols[m]) {
             Term_Color hc;
             hc.type = COLOR_RGB;
-            if (m == gui->search_current) {
+            if (m == gui->search.search_current) {
               hc.rgb = (Term_RGB){255, 165, 0}; // orange: focused match
             } else {
               hc.rgb = (Term_RGB){160, 120, 0}; // dark gold: other matches
@@ -478,7 +478,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       }
 
       bool is_cursor =
-          gui->cursor_visible && !term_screen->cursor_hidden &&
+          gui->cursor.cursor_visible && !term_screen->cursor_hidden &&
           (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
       int cursor_shape = terminal->cursor_shape;
@@ -495,36 +495,36 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
         bg_color =
             (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
                 ? get_color_pixel(gui, cell.attr.fg)
-                : gui->default_fg;
+                : gui->color.default_fg;
       } else {
         text_color =
             (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
                 ? get_color_pixel(gui, cell.attr.fg)
-                : gui->default_fg;
+                : gui->color.default_fg;
       }
 
       // Default-bg cells are already painted by the initial clear; only draw
       // explicitly-colored backgrounds (and always opaque).
-      int cell_alpha = is_default_bg ? gui->alpha : 255;
-      bg_fill(gui, pixel_x, pixel_y, draw_width, gui->char_height, bg_color,
+      int cell_alpha = is_default_bg ? gui->surface.alpha : 255;
+      bg_fill(gui, pixel_x, pixel_y, draw_width, gui->fonts.char_height, bg_color,
               cell_alpha);
 
       if (cell.length > 0) {
         XftColor *fg_color;
-        XftFont *font_to_use = cell.attr.bold     ? gui->font_bold
-                               : cell.attr.italic ? gui->font_italic
-                                                  : gui->font;
+        XftFont *font_to_use = cell.attr.bold     ? gui->fonts.font_bold
+                               : cell.attr.italic ? gui->fonts.font_italic
+                                                  : gui->fonts.font;
 
         if (reverse) {
           fg_color =
               (cell.attr.bg.type != COLOR_DEFAULT || cell.attr.bg.color != 0)
                   ? get_xft_color(gui, cell.attr.bg)
-                  : &gui->xft_default_bg;
+                  : &gui->color.xft_default_bg;
         } else {
           fg_color =
               (cell.attr.fg.type != COLOR_DEFAULT || cell.attr.fg.color != 0)
                   ? get_xft_color(gui, cell.attr.fg)
-                  : &gui->xft_default_fg;
+                  : &gui->color.xft_default_fg;
         }
 
         XftColor dim_color;
@@ -536,65 +536,65 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           fg_color = &dim_color;
         }
 
-        if (cell.attr.blink && !gui->cursor_visible)
+        if (cell.attr.blink && !gui->cursor.cursor_visible)
           goto skip_text;
 
-        XftDrawStringUtf8(gui->xft_draw, fg_color, font_to_use, pixel_x,
-                          pixel_y + gui->char_ascent, (FcChar8 *)cell.data,
+        XftDrawStringUtf8(gui->color.xft_draw, fg_color, font_to_use, pixel_x,
+                          pixel_y + gui->fonts.char_ascent, (FcChar8 *)cell.data,
                           cell.length);
 
         if (cell.attr.underline || cell.attr.uri_idx > 0) {
-          XSetForeground(gui->display, gui->gc, opaque_pixel(gui, text_color));
-          XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                    pixel_y + gui->char_height - 1, pixel_x + draw_width - 1,
-                    pixel_y + gui->char_height - 1);
+          XSetForeground(gui->x11.display, gui->x11.gc, opaque_pixel(gui, text_color));
+          XDrawLine(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, pixel_x,
+                    pixel_y + gui->fonts.char_height - 1, pixel_x + draw_width - 1,
+                    pixel_y + gui->fonts.char_height - 1);
         }
         if (cell.attr.strikethrough) {
-          XSetForeground(gui->display, gui->gc, opaque_pixel(gui, text_color));
-          XDrawLine(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                    pixel_y + gui->char_ascent / 2, pixel_x + draw_width - 1,
-                    pixel_y + gui->char_ascent / 2);
+          XSetForeground(gui->x11.display, gui->x11.gc, opaque_pixel(gui, text_color));
+          XDrawLine(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, pixel_x,
+                    pixel_y + gui->fonts.char_ascent / 2, pixel_x + draw_width - 1,
+                    pixel_y + gui->fonts.char_ascent / 2);
         }
       skip_text:;
       }
 
       if (is_cursor && !is_block_cursor) {
-        XSetForeground(gui->display, gui->gc,
-                       opaque_pixel(gui, gui->default_fg));
+        XSetForeground(gui->x11.display, gui->x11.gc,
+                       opaque_pixel(gui, gui->color.default_fg));
         if (cursor_shape == 3 || cursor_shape == 4) {
-          XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                         pixel_y + gui->char_height - 2, draw_width, 2);
+          XFillRectangle(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, pixel_x,
+                         pixel_y + gui->fonts.char_height - 2, draw_width, 2);
         } else {
-          XFillRectangle(gui->display, gui->backbuffer, gui->gc, pixel_x,
-                         pixel_y, 2, gui->char_height);
+          XFillRectangle(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, pixel_x,
+                         pixel_y, 2, gui->fonts.char_height);
         }
       }
     }
   }
 
-  if (gui->search_active) {
-    int bar_y = gui->window_height - gui->char_height - gui->margin;
+  if (gui->search.search_active) {
+    int bar_y = gui->surface.window_height - gui->fonts.char_height - gui->surface.margin;
     Term_Color bar_bg = {.type = COLOR_RGB, .rgb = {255, 220, 50}};
-    XSetForeground(gui->display, gui->gc,
+    XSetForeground(gui->x11.display, gui->x11.gc,
                    opaque_pixel(gui, get_color_pixel(gui, bar_bg)));
-    XFillRectangle(gui->display, gui->backbuffer, gui->gc, 0, bar_y,
-                   gui->window_width, gui->char_height + gui->margin);
+    XFillRectangle(gui->x11.display, gui->surface.backbuffer, gui->x11.gc, 0, bar_y,
+                   gui->surface.window_width, gui->fonts.char_height + gui->surface.margin);
     char bar[400];
     int blen;
-    if (gui->search_query_len == 0) {
+    if (gui->search.search_query_len == 0) {
       blen = snprintf(bar, sizeof(bar), " /");
-    } else if (gui->search_match_count == 0) {
+    } else if (gui->search.search_match_count == 0) {
       blen =
-          snprintf(bar, sizeof(bar), " /%s  [no matches]", gui->search_query);
+          snprintf(bar, sizeof(bar), " /%s  [no matches]", gui->search.search_query);
     } else {
-      blen = snprintf(bar, sizeof(bar), " /%s  [%d/%d]", gui->search_query,
-                      gui->search_current + 1, gui->search_match_count);
+      blen = snprintf(bar, sizeof(bar), " /%s  [%d/%d]", gui->search.search_query,
+                      gui->search.search_current + 1, gui->search.search_match_count);
     }
-    XftDrawStringUtf8(gui->xft_draw, &gui->xft_colors[0], gui->font,
-                      gui->margin, bar_y + gui->char_ascent, (FcChar8 *)bar,
+    XftDrawStringUtf8(gui->color.xft_draw, &gui->color.xft_colors[0], gui->fonts.font,
+                      gui->surface.margin, bar_y + gui->fonts.char_ascent, (FcChar8 *)bar,
                       blen > 0 ? blen : 0);
   }
 
-  XCopyArea(gui->display, gui->backbuffer, gui->window, gui->gc, 0, 0,
-            gui->window_width, gui->window_height, 0, 0);
+  XCopyArea(gui->x11.display, gui->surface.backbuffer, gui->x11.window, gui->x11.gc, 0, 0,
+            gui->surface.window_width, gui->surface.window_height, 0, 0);
 }

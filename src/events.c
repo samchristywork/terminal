@@ -31,7 +31,7 @@ static void send_mouse_event(GuiContext *gui, Terminal *terminal, int btn,
     buf[5] = (char)(y + 1 + 32);
     len = 6;
   }
-  write(gui->pipe_fd, buf, len);
+  write(gui->process.pipe_fd, buf, len);
 }
 
 static void on_configure(GuiContext *gui, Terminal *terminal,
@@ -39,32 +39,32 @@ static void on_configure(GuiContext *gui, Terminal *terminal,
   int new_width = ev->width;
   int new_height = ev->height;
 
-  if (new_width == gui->window_width && new_height == gui->window_height)
+  if (new_width == gui->surface.window_width && new_height == gui->surface.window_height)
     return;
 
   LOG_DEBUG_MSG("Window resized to %dx%d", new_width, new_height);
-  gui->window_width = new_width;
-  gui->window_height = new_height;
+  gui->surface.window_width = new_width;
+  gui->surface.window_height = new_height;
 
-  int depth = (gui->alpha < 255) ? 32 : DefaultDepth(gui->display, gui->screen);
-  XFreePixmap(gui->display, gui->backbuffer);
-  gui->backbuffer = XCreatePixmap(gui->display, gui->window, gui->window_width,
-                                  gui->window_height, depth);
+  int depth = (gui->surface.alpha < 255) ? 32 : DefaultDepth(gui->x11.display, gui->x11.screen);
+  XFreePixmap(gui->x11.display, gui->surface.backbuffer);
+  gui->surface.backbuffer = XCreatePixmap(gui->x11.display, gui->x11.window, gui->surface.window_width,
+                                  gui->surface.window_height, depth);
 
-  XftDrawDestroy(gui->xft_draw);
-  gui->xft_draw =
-      XftDrawCreate(gui->display, gui->backbuffer, gui->visual, gui->colormap);
+  XftDrawDestroy(gui->color.xft_draw);
+  gui->color.xft_draw =
+      XftDrawCreate(gui->x11.display, gui->surface.backbuffer, gui->x11.visual, gui->x11.colormap);
 
-  if (gui->backbuffer_picture) {
-    XRenderFreePicture(gui->display, gui->backbuffer_picture);
-    XRenderPictFormat *fmt = XRenderFindVisualFormat(gui->display, gui->visual);
-    gui->backbuffer_picture =
-        fmt ? XRenderCreatePicture(gui->display, gui->backbuffer, fmt, 0, NULL)
+  if (gui->surface.backbuffer_picture) {
+    XRenderFreePicture(gui->x11.display, gui->surface.backbuffer_picture);
+    XRenderPictFormat *fmt = XRenderFindVisualFormat(gui->x11.display, gui->x11.visual);
+    gui->surface.backbuffer_picture =
+        fmt ? XRenderCreatePicture(gui->x11.display, gui->surface.backbuffer, fmt, 0, NULL)
             : None;
   }
 
-  int term_cols = (new_width - 2 * gui->margin) / gui->char_width;
-  int term_rows = (new_height - 2 * gui->margin) / gui->char_height;
+  int term_cols = (new_width - 2 * gui->surface.margin) / gui->fonts.char_width;
+  int term_rows = (new_height - 2 * gui->surface.margin) / gui->fonts.char_height;
   if (term_cols < 1)
     term_cols = 1;
   if (term_rows < 1)
@@ -79,15 +79,15 @@ static void on_configure(GuiContext *gui, Terminal *terminal,
       .ws_xpixel = 0,
       .ws_ypixel = 0,
   };
-  ioctl(gui->pipe_fd, TIOCSWINSZ, &ws);
-  kill(gui->child_pid, SIGWINCH);
+  ioctl(gui->process.pipe_fd, TIOCSWINSZ, &ws);
+  kill(gui->process.child_pid, SIGWINCH);
 
   draw_terminal(gui, terminal);
 }
 
 static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
-  gui->cursor_visible = true;
-  clock_gettime(CLOCK_MONOTONIC, &gui->last_blink);
+  gui->cursor.cursor_visible = true;
+  clock_gettime(CLOCK_MONOTONIC, &gui->cursor.last_blink);
 
   char buffer[32];
   KeySym keysym;
@@ -100,28 +100,28 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
   // Toggle search with Ctrl+Shift+F
   if ((keysym == XK_f || keysym == XK_F) && (ev->state & ControlMask) &&
       (ev->state & ShiftMask)) {
-    gui->search_active = !gui->search_active;
-    if (gui->search_active) {
-      gui->search_query_len = 0;
-      gui->search_query[0] = '\0';
-      gui->search_match_count = 0;
-      gui->search_current = -1;
+    gui->search.search_active = !gui->search.search_active;
+    if (gui->search.search_active) {
+      gui->search.search_query_len = 0;
+      gui->search.search_query[0] = '\0';
+      gui->search.search_match_count = 0;
+      gui->search.search_current = -1;
     }
     draw_terminal(gui, terminal);
     return;
   }
 
-  if (gui->search_active) {
+  if (gui->search.search_active) {
     if (keysym == XK_Escape) {
-      gui->search_active = false;
-      gui->search_match_count = 0;
+      gui->search.search_active = false;
+      gui->search.search_match_count = 0;
     } else if (keysym == XK_Return || keysym == XK_KP_Enter) {
-      if (gui->search_match_count > 0) {
+      if (gui->search.search_match_count > 0) {
         int dir = (ev->state & ShiftMask) ? -1 : 1;
-        gui->search_current =
-            (gui->search_current + dir + gui->search_match_count) %
-            gui->search_match_count;
-        int abs_row = gui->search_rows[gui->search_current];
+        gui->search.search_current =
+            (gui->search.search_current + dir + gui->search.search_match_count) %
+            gui->search.search_match_count;
+        int abs_row = gui->search.search_rows[gui->search.search_current];
         int offset = scr->scrollback.count - abs_row;
         if (offset < 0)
           offset = 0;
@@ -130,20 +130,20 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
         scr->scroll_offset = offset;
       }
     } else if (keysym == XK_BackSpace) {
-      if (gui->search_query_len > 0) {
-        gui->search_query_len--;
-        while (gui->search_query_len > 0 &&
-               (gui->search_query[gui->search_query_len] & 0xC0) == 0x80)
-          gui->search_query_len--;
-        gui->search_query[gui->search_query_len] = '\0';
+      if (gui->search.search_query_len > 0) {
+        gui->search.search_query_len--;
+        while (gui->search.search_query_len > 0 &&
+               (gui->search.search_query[gui->search.search_query_len] & 0xC0) == 0x80)
+          gui->search.search_query_len--;
+        gui->search.search_query[gui->search.search_query_len] = '\0';
         run_search(gui, terminal);
       }
     } else if (buffer_len > 0 && (unsigned char)buffer[0] >= 0x20) {
-      if (gui->search_query_len + buffer_len <
-          (int)sizeof(gui->search_query) - 1) {
-        memcpy(gui->search_query + gui->search_query_len, buffer, buffer_len);
-        gui->search_query_len += buffer_len;
-        gui->search_query[gui->search_query_len] = '\0';
+      if (gui->search.search_query_len + buffer_len <
+          (int)sizeof(gui->search.search_query) - 1) {
+        memcpy(gui->search.search_query + gui->search.search_query_len, buffer, buffer_len);
+        gui->search.search_query_len += buffer_len;
+        gui->search.search_query[gui->search.search_query_len] = '\0';
         run_search(gui, terminal);
       }
     }
@@ -163,21 +163,21 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     draw_terminal(gui, terminal);
   } else if ((keysym == XK_c || keysym == XK_C) && (ev->state & ControlMask) &&
              (ev->state & ShiftMask)) {
-    if (gui->has_selection)
-      XSetSelectionOwner(gui->display, gui->atom_clipboard, gui->window,
+    if (gui->selection.has_selection)
+      XSetSelectionOwner(gui->x11.display, gui->selection.atom_clipboard, gui->x11.window,
                          CurrentTime);
   } else if ((keysym == XK_v || keysym == XK_V) && (ev->state & ControlMask) &&
              (ev->state & ShiftMask)) {
-    XConvertSelection(gui->display, gui->atom_clipboard, gui->atom_utf8_string,
-                      gui->atom_xsel_data, gui->window, CurrentTime);
+    XConvertSelection(gui->x11.display, gui->selection.atom_clipboard, gui->selection.atom_utf8_string,
+                      gui->selection.atom_xsel_data, gui->x11.window, CurrentTime);
   } else if (keysym == XK_BackSpace) {
-    write(gui->pipe_fd, "\x7f", 1);
+    write(gui->process.pipe_fd, "\x7f", 1);
   } else if (keysym == XK_Return || keysym == XK_KP_Enter) {
-    write(gui->pipe_fd, "\r", 1);
+    write(gui->process.pipe_fd, "\r", 1);
   } else if (keysym == XK_Tab) {
-    write(gui->pipe_fd, "\t", 1);
+    write(gui->process.pipe_fd, "\t", 1);
   } else if (keysym == XK_Escape) {
-    write(gui->pipe_fd, "\x1b", 1);
+    write(gui->process.pipe_fd, "\x1b", 1);
   } else if (keysym == XK_Up && (ev->state & ControlMask) &&
              (ev->state & ShiftMask)) {
     int cur_top = scr->scrollback.count - scr->scroll_offset;
@@ -225,29 +225,29 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     }
     draw_terminal(gui, terminal);
   } else if (keysym == XK_Up) {
-    write(gui->pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
+    write(gui->process.pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5A" : "\x1b[A",
           (ev->state & ControlMask) ? 6 : 3);
   } else if (keysym == XK_Down) {
-    write(gui->pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5B" : "\x1b[B",
+    write(gui->process.pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5B" : "\x1b[B",
           (ev->state & ControlMask) ? 6 : 3);
   } else if (keysym == XK_Right) {
-    write(gui->pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5C" : "\x1b[C",
+    write(gui->process.pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5C" : "\x1b[C",
           (ev->state & ControlMask) ? 6 : 3);
   } else if (keysym == XK_Left) {
-    write(gui->pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5D" : "\x1b[D",
+    write(gui->process.pipe_fd, (ev->state & ControlMask) ? "\x1b[1;5D" : "\x1b[D",
           (ev->state & ControlMask) ? 6 : 3);
   } else if (keysym == XK_Home) {
-    write(gui->pipe_fd, "\x1b[H", 3);
+    write(gui->process.pipe_fd, "\x1b[H", 3);
   } else if (keysym == XK_End) {
-    write(gui->pipe_fd, "\x1b[F", 3);
+    write(gui->process.pipe_fd, "\x1b[F", 3);
   } else if (keysym == XK_Insert) {
-    write(gui->pipe_fd, "\x1b[2~", 4);
+    write(gui->process.pipe_fd, "\x1b[2~", 4);
   } else if (keysym == XK_Delete) {
-    write(gui->pipe_fd, "\x1b[3~", 4);
+    write(gui->process.pipe_fd, "\x1b[3~", 4);
   } else if (keysym == XK_Prior) {
-    write(gui->pipe_fd, "\x1b[5~", 4);
+    write(gui->process.pipe_fd, "\x1b[5~", 4);
   } else if (keysym == XK_Next) {
-    write(gui->pipe_fd, "\x1b[6~", 4);
+    write(gui->process.pipe_fd, "\x1b[6~", 4);
   } else if ((keysym == XK_plus || keysym == XK_equal) &&
              (ev->state & ControlMask)) {
     change_font_size(gui, terminal, 1);
@@ -258,7 +258,7 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
         "\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",   "\x1b[15~", "\x1b[17~",
         "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~",
     };
-    write(gui->pipe_fd, fkeys[keysym - XK_F1], strlen(fkeys[keysym - XK_F1]));
+    write(gui->process.pipe_fd, fkeys[keysym - XK_F1], strlen(fkeys[keysym - XK_F1]));
   } else {
     int len = XLookupString(ev, buffer, sizeof(buffer), NULL, NULL);
     if (len > 0) {
@@ -266,9 +266,9 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
         char alt_buf[33];
         alt_buf[0] = '\x1b';
         memcpy(&alt_buf[1], buffer, len);
-        write(gui->pipe_fd, alt_buf, len + 1);
+        write(gui->process.pipe_fd, alt_buf, len + 1);
       } else {
-        write(gui->pipe_fd, buffer, len);
+        write(gui->process.pipe_fd, buffer, len);
       }
     }
   }
@@ -318,12 +318,12 @@ static void select_word(GuiContext *gui, Terminal *terminal, Term_Screen *scr,
       end++;
   }
 
-  gui->sel_anchor_x = start;
-  gui->sel_anchor_y = abs_row;
-  gui->sel_cur_x = end;
-  gui->sel_cur_y = abs_row;
-  gui->has_selection = true;
-  gui->selecting = false;
+  gui->selection.sel_anchor_x = start;
+  gui->selection.sel_anchor_y = abs_row;
+  gui->selection.sel_cur_x = end;
+  gui->selection.sel_cur_y = abs_row;
+  gui->selection.has_selection = true;
+  gui->selection.selecting = false;
 }
 
 static void on_button_press(GuiContext *gui, Terminal *terminal,
@@ -331,8 +331,8 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
   Term_Screen *scr =
       terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
   int max_scroll = scr->scrollback.count;
-  int cell_x = (ev->x - gui->margin) / gui->char_width;
-  int cell_y = (ev->y - gui->margin) / gui->char_height;
+  int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
+  int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
   if (cell_x < 0)
     cell_x = 0;
   if (cell_x >= terminal->width)
@@ -390,34 +390,34 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
   if (ev->button == Button1) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    long elapsed_ms = (now.tv_sec - gui->last_click_time.tv_sec) * 1000 +
-                      (now.tv_nsec - gui->last_click_time.tv_nsec) / 1000000;
+    long elapsed_ms = (now.tv_sec - gui->click.last_click_time.tv_sec) * 1000 +
+                      (now.tv_nsec - gui->click.last_click_time.tv_nsec) / 1000000;
     int anchor_row = scr->scrollback.count - scr->scroll_offset + cell_y;
 
-    if (elapsed_ms < 300 && cell_x == gui->last_click_x &&
-        anchor_row == gui->last_click_y) {
+    if (elapsed_ms < 300 && cell_x == gui->click.last_click_x &&
+        anchor_row == gui->click.last_click_y) {
       select_word(gui, terminal, scr, anchor_row, cell_x);
-      if (gui->has_selection) {
+      if (gui->selection.has_selection) {
         build_selection_text(gui, terminal);
-        XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+        XSetSelectionOwner(gui->x11.display, XA_PRIMARY, gui->x11.window, CurrentTime);
       }
-      gui->last_click_time.tv_sec = 0;
-      gui->last_click_time.tv_nsec = 0;
+      gui->click.last_click_time.tv_sec = 0;
+      gui->click.last_click_time.tv_nsec = 0;
     } else {
-      gui->last_click_time = now;
-      gui->last_click_x = cell_x;
-      gui->last_click_y = anchor_row;
-      gui->selecting = true;
-      gui->has_selection = false;
-      gui->sel_anchor_x = cell_x;
-      gui->sel_anchor_y = anchor_row;
-      gui->sel_cur_x = cell_x;
-      gui->sel_cur_y = anchor_row;
+      gui->click.last_click_time = now;
+      gui->click.last_click_x = cell_x;
+      gui->click.last_click_y = anchor_row;
+      gui->selection.selecting = true;
+      gui->selection.has_selection = false;
+      gui->selection.sel_anchor_x = cell_x;
+      gui->selection.sel_anchor_y = anchor_row;
+      gui->selection.sel_cur_x = cell_x;
+      gui->selection.sel_cur_y = anchor_row;
     }
     draw_terminal(gui, terminal);
   } else if (ev->button == Button2) {
-    XConvertSelection(gui->display, XA_PRIMARY, gui->atom_utf8_string,
-                      gui->atom_xsel_data, gui->window, CurrentTime);
+    XConvertSelection(gui->x11.display, XA_PRIMARY, gui->selection.atom_utf8_string,
+                      gui->selection.atom_xsel_data, gui->x11.window, CurrentTime);
   } else if (ev->button == Button4) {
     scr->scroll_offset += 3;
     if (scr->scroll_offset > max_scroll)
@@ -436,8 +436,8 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
   bool shift = (ev->state & ShiftMask) != 0;
 
   if (terminal->mouse_mode >= 1 && !shift) {
-    int cell_x = (ev->x - gui->margin) / gui->char_width;
-    int cell_y = (ev->y - gui->margin) / gui->char_height;
+    int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
+    int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
     if (cell_x < 0)
       cell_x = 0;
     if (cell_x >= terminal->width)
@@ -473,11 +473,11 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
   if (ev->button != Button1)
     return;
 
-  if (gui->selecting) {
+  if (gui->selection.selecting) {
     Term_Screen *scr =
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
-    int cell_x = (ev->x - gui->margin) / gui->char_width;
-    int cell_y = (ev->y - gui->margin) / gui->char_height;
+    int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
+    int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
     if (cell_x < 0)
       cell_x = 0;
     if (cell_x >= terminal->width)
@@ -487,22 +487,22 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
     if (cell_y >= terminal->height)
       cell_y = terminal->height - 1;
     int cur_row = scr->scrollback.count - scr->scroll_offset + cell_y;
-    gui->sel_cur_x = cell_x;
-    gui->sel_cur_y = cur_row;
-    gui->selecting = false;
-    gui->has_selection =
-        (gui->sel_anchor_x != cell_x || gui->sel_anchor_y != cur_row);
-    if (gui->has_selection) {
+    gui->selection.sel_cur_x = cell_x;
+    gui->selection.sel_cur_y = cur_row;
+    gui->selection.selecting = false;
+    gui->selection.has_selection =
+        (gui->selection.sel_anchor_x != cell_x || gui->selection.sel_anchor_y != cur_row);
+    if (gui->selection.has_selection) {
       build_selection_text(gui, terminal);
-      XSetSelectionOwner(gui->display, XA_PRIMARY, gui->window, CurrentTime);
+      XSetSelectionOwner(gui->x11.display, XA_PRIMARY, gui->x11.window, CurrentTime);
     }
     draw_terminal(gui, terminal);
   }
 }
 
 static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
-  int cell_x = (ev->x - gui->margin) / gui->char_width;
-  int cell_y = (ev->y - gui->margin) / gui->char_height;
+  int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
+  int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
   if (cell_x < 0)
     cell_x = 0;
   if (cell_x >= terminal->width)
@@ -540,12 +540,12 @@ static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
     }
   }
 
-  if (gui->selecting) {
+  if (gui->selection.selecting) {
     Term_Screen *scr =
         terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
-    gui->sel_cur_x = cell_x;
-    gui->sel_cur_y = scr->scrollback.count - scr->scroll_offset + cell_y;
-    gui->has_selection = true;
+    gui->selection.sel_cur_x = cell_x;
+    gui->selection.sel_cur_y = scr->scrollback.count - scr->scroll_offset + cell_y;
+    gui->selection.has_selection = true;
     build_selection_text(gui, terminal);
     draw_terminal(gui, terminal);
   }
@@ -561,11 +561,11 @@ static void on_selection_request(GuiContext *gui, XSelectionRequestEvent *req) {
   reply.target = req->target;
   reply.property = None;
   reply.time = req->time;
-  if (gui->has_selection && gui->selection_text &&
-      (req->target == gui->atom_utf8_string || req->target == XA_STRING)) {
+  if (gui->selection.has_selection && gui->selection.selection_text &&
+      (req->target == gui->selection.atom_utf8_string || req->target == XA_STRING)) {
     XChangeProperty(req->display, req->requestor, req->property, req->target, 8,
-                    PropModeReplace, (unsigned char *)gui->selection_text,
-                    gui->selection_len);
+                    PropModeReplace, (unsigned char *)gui->selection.selection_text,
+                    gui->selection.selection_len);
     reply.property = req->property;
   }
   XSendEvent(req->display, req->requestor, False, 0, (XEvent *)&reply);
@@ -579,15 +579,15 @@ static void on_selection_notify(GuiContext *gui, Terminal *terminal,
   int actual_format;
   unsigned long nitems, bytes_after;
   unsigned char *data = NULL;
-  XGetWindowProperty(gui->display, gui->window, gui->atom_xsel_data, 0, 65536,
+  XGetWindowProperty(gui->x11.display, gui->x11.window, gui->selection.atom_xsel_data, 0, 65536,
                      True, AnyPropertyType, &actual_type, &actual_format,
                      &nitems, &bytes_after, &data);
   if (data) {
     if (terminal->bracketed_paste)
-      write(gui->pipe_fd, "\x1b[200~", 6);
-    write(gui->pipe_fd, data, nitems);
+      write(gui->process.pipe_fd, "\x1b[200~", 6);
+    write(gui->process.pipe_fd, data, nitems);
     if (terminal->bracketed_paste)
-      write(gui->pipe_fd, "\x1b[201~", 6);
+      write(gui->process.pipe_fd, "\x1b[201~", 6);
     XFree(data);
   }
 }
