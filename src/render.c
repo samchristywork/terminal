@@ -256,10 +256,10 @@ void build_selection_text(GuiContext *gui, Terminal *terminal) {
   }
 
   Term_Screen *scr =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
   Term_Scrollback *sb = &scr->scrollback;
 
-  int max_len = (terminal->width * 6 + 1) * (end_y - start_y + 1) + 1;
+  int max_len = (terminal->dims.width * 6 + 1) * (end_y - start_y + 1) + 1;
   char *buf = malloc(max_len);
   if (!buf)
     return;
@@ -267,7 +267,7 @@ void build_selection_text(GuiContext *gui, Terminal *terminal) {
 
   for (int combined = start_y; combined <= end_y; combined++) {
     int x0 = (combined == start_y) ? start_x : 0;
-    int x1 = (combined == end_y) ? end_x : terminal->width - 1;
+    int x1 = (combined == end_y) ? end_x : terminal->dims.width - 1;
 
     for (int x = x0; x <= x1; x++) {
       Term_Cell cell;
@@ -302,16 +302,16 @@ void run_search(GuiContext *gui, Terminal *terminal) {
     return;
 
   Term_Screen *scr =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
   Term_Scrollback *sb = &scr->scrollback;
-  int total_rows = sb->count + terminal->height;
+  int total_rows = sb->count + terminal->dims.height;
 
   for (int row = 0; row < total_rows; row++) {
     char buf[4096];
     int col_at_byte[4096];
     int buf_len = 0;
 
-    for (int x = 0; x < terminal->width && buf_len < (int)sizeof(buf) - 7;
+    for (int x = 0; x < terminal->dims.width && buf_len < (int)sizeof(buf) - 7;
          x++) {
       Term_Cell cell;
       if (row < sb->count) {
@@ -396,7 +396,7 @@ static unsigned long opaque_pixel(GuiContext *gui, unsigned long pixel) {
 
 void draw_terminal(GuiContext *gui, Terminal *terminal) {
   Term_Screen *term_screen =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
 
   // Clear entire backbuffer: transparent bg, or opaque fg during bell flash
   if (gui->bell.bell_flash) {
@@ -410,14 +410,14 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
   int scroll_offset = term_screen->scroll_offset;
   Term_Scrollback *sb = &term_screen->scrollback;
 
-  for (int y = 0; y < terminal->height; y++) {
+  for (int y = 0; y < terminal->dims.height; y++) {
     if (gui->surface.margin >= 4) {
       int combined_row = sb->count - scroll_offset + y;
       int oldest = sb->count - sb->capacity;
-      for (int m = 0; m < terminal->shell_mark_count; m++) {
+      for (int m = 0; m < terminal->marks.shell_mark_count; m++) {
         int mark =
             terminal
-                ->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+                ->marks.shell_marks[(terminal->marks.shell_mark_head + m) % SHELL_MARK_MAX];
         if (mark < oldest)
           continue;
         if (mark == combined_row) {
@@ -431,7 +431,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
       }
     }
 
-    for (int x = 0; x < terminal->width; x++) {
+    for (int x = 0; x < terminal->dims.width; x++) {
       Term_Cell cell;
       int combined = sb->count - scroll_offset + y;
       if (combined < 0) {
@@ -481,7 +481,7 @@ void draw_terminal(GuiContext *gui, Terminal *terminal) {
           gui->cursor.cursor_visible && !term_screen->cursor_hidden &&
           (scroll_offset == 0) &&
           (term_screen->cursor.x == x && term_screen->cursor.y == y);
-      int cursor_shape = terminal->cursor_shape;
+      int cursor_shape = terminal->modes.cursor_shape;
       bool is_block_cursor = is_cursor && (cursor_shape <= 2);
       bool in_selection = cell_in_selection(gui, x, combined);
       bool reverse = cell.attr.reverse || is_block_cursor || in_selection;

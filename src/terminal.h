@@ -79,42 +79,77 @@ typedef struct {
 typedef struct {
   int width;
   int height;
+} Term_Dims;
+
+typedef struct {
   Term_Screen screen;
   Term_Screen alt_screen;
   bool using_alt_screen;
+} Term_Screens;
+
+typedef struct {
   char window_title[256];
   char icon_name[256];
   bool title_dirty;
-  char partial_buf[64];
-  int partial_len;
-  bool bracketed_paste;
-  int mouse_mode; // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
-  bool mouse_sgr; // SGR extended coordinates (1006)
-  unsigned long osc_fg; // packed 0xRRGGBB set by OSC 10
-  bool fg_dirty;
-  unsigned long osc_bg; // packed 0xRRGGBB set by OSC 11
-  bool bg_dirty;
-  unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
-  int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking
-                    // underline, 4=steady underline, 5=blinking bar, 6=steady
-                    // bar
-  bool bell_pending;
-  char *osc52_text;
-  int osc52_len;
-  bool osc52_dirty;
-  char response_buf[256];
-  int response_len;
   char window_title_stack[32][256];
   int window_title_stack_depth;
   char icon_name_stack[32][256];
   int icon_name_stack_depth;
+} Term_Title;
+
+typedef struct {
+  char partial_buf[64];
+  int partial_len;
+} Term_Parser;
+
+typedef struct {
+  bool bracketed_paste;
+  int mouse_mode; // 0=off, 1=click(1000), 2=button+motion(1002), 3=any(1003)
+  bool mouse_sgr; // SGR extended coordinates (1006)
+  int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking
+                    // underline, 4=steady underline, 5=blinking bar, 6=steady bar
+  bool bell_pending;
+} Term_Modes;
+
+typedef struct {
+  unsigned long osc_fg;      // packed 0xRRGGBB set by OSC 10
+  bool fg_dirty;
+  unsigned long osc_bg;      // packed 0xRRGGBB set by OSC 11
+  bool bg_dirty;
+  unsigned long default_fg_rgb; // packed 0xRRGGBB, for OSC 10 query response
+  char *osc52_text;
+  int osc52_len;
+  bool osc52_dirty;
+} Term_Osc;
+
+typedef struct {
+  char response_buf[256];
+  int response_len;
+} Term_Response;
+
+typedef struct {
   char *uri_table[1024];
   int uri_count;
+} Term_Uri;
+
 #define SHELL_MARK_MAX 512
-  int shell_marks[SHELL_MARK_MAX]; // absolute row (scrollback.count + cursor.y)
-                                   // at OSC 133;A
+
+typedef struct {
+  int shell_marks[SHELL_MARK_MAX]; // absolute row (scrollback.count + cursor.y) at OSC 133;A
   int shell_mark_count;
   int shell_mark_head;
+} Term_Marks;
+
+typedef struct {
+  Term_Dims dims;
+  Term_Screens screens;
+  Term_Title title;
+  Term_Parser parser;
+  Term_Modes modes;
+  Term_Osc osc;
+  Term_Response response;
+  Term_Uri uri;
+  Term_Marks marks;
 } Terminal;
 
 typedef enum {

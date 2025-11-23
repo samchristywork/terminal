@@ -11,11 +11,11 @@ static void handle_erase(Term_Screen *screen, Term_TokenType type, int width,
                          int height);
 
 static void terminal_respond(Terminal *t, const char *data, int len) {
-  int available = (int)sizeof(t->response_buf) - t->response_len;
+  int available = (int)sizeof(t->response.response_buf) - t->response.response_len;
   if (len > available)
     len = available;
-  memcpy(t->response_buf + t->response_len, data, len);
-  t->response_len += len;
+  memcpy(t->response.response_buf + t->response.response_len, data, len);
+  t->response.response_len += len;
 }
 
 static void handle_field(Term_Cursor **cursor, int value) {
@@ -219,8 +219,8 @@ static int incomplete_escape_tail(const char *buf, int len) {
 
 static void handle_csi(Terminal *terminal, Term_Screen *screen,
                        Term_Token token) {
-  int width = terminal->width;
-  int height = terminal->height;
+  int width = terminal->dims.width;
+  int height = terminal->dims.height;
   Term_Cursor *cursor = &screen->cursor;
   char final = token.value[token.length - 1];
   int n = csi_param(token, 1);
@@ -350,23 +350,23 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
   } else if (final == 'h' || final == 'l') {
     bool enable = (final == 'h');
     if (starts_with(token.value, token.length, "\x1b[?1000"))
-      terminal->mouse_mode = enable ? 1 : 0;
+      terminal->modes.mouse_mode = enable ? 1 : 0;
     else if (starts_with(token.value, token.length, "\x1b[?1002"))
-      terminal->mouse_mode = enable ? 2 : 0;
+      terminal->modes.mouse_mode = enable ? 2 : 0;
     else if (starts_with(token.value, token.length, "\x1b[?1003"))
-      terminal->mouse_mode = enable ? 3 : 0;
+      terminal->modes.mouse_mode = enable ? 3 : 0;
     else if (starts_with(token.value, token.length, "\x1b[?1006"))
-      terminal->mouse_sgr = enable;
+      terminal->modes.mouse_sgr = enable;
     else if (starts_with(token.value, token.length, "\x1b[?1049")) {
-      if (enable && !terminal->using_alt_screen)
-        terminal->screen.saved_cursor = terminal->screen.cursor;
-      terminal->using_alt_screen = enable;
+      if (enable && !terminal->screens.using_alt_screen)
+        terminal->screens.screen.saved_cursor = terminal->screens.screen.cursor;
+      terminal->screens.using_alt_screen = enable;
       if (!enable)
-        terminal->screen.cursor = terminal->screen.saved_cursor;
+        terminal->screens.screen.cursor = terminal->screens.screen.saved_cursor;
     } else if (starts_with(token.value, token.length, "\x1b[?25"))
       screen->cursor_hidden = !enable;
     else if (starts_with(token.value, token.length, "\x1b[?2004"))
-      terminal->bracketed_paste = enable;
+      terminal->modes.bracketed_paste = enable;
   } else if (final == 't') {
     const char *p = token.value + 2;
     const char *end = token.value + token.length - 1;
@@ -380,38 +380,38 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
     }
     if (n1 == 22) {
       if (n2 == 0 || n2 == 2) {
-        if (terminal->window_title_stack_depth < 32) {
+        if (terminal->title.window_title_stack_depth < 32) {
           memcpy(
-              terminal->window_title_stack[terminal->window_title_stack_depth],
-              terminal->window_title, 256);
-          terminal->window_title_stack_depth++;
+              terminal->title.window_title_stack[terminal->title.window_title_stack_depth],
+              terminal->title.window_title, 256);
+          terminal->title.window_title_stack_depth++;
         }
       }
       if (n2 == 0 || n2 == 1) {
-        if (terminal->icon_name_stack_depth < 32) {
-          memcpy(terminal->icon_name_stack[terminal->icon_name_stack_depth],
-                 terminal->icon_name, 256);
-          terminal->icon_name_stack_depth++;
+        if (terminal->title.icon_name_stack_depth < 32) {
+          memcpy(terminal->title.icon_name_stack[terminal->title.icon_name_stack_depth],
+                 terminal->title.icon_name, 256);
+          terminal->title.icon_name_stack_depth++;
         }
       }
     } else if (n1 == 23) {
       if (n2 == 0 || n2 == 2) {
-        if (terminal->window_title_stack_depth > 0) {
-          terminal->window_title_stack_depth--;
+        if (terminal->title.window_title_stack_depth > 0) {
+          terminal->title.window_title_stack_depth--;
           memcpy(
-              terminal->window_title,
-              terminal->window_title_stack[terminal->window_title_stack_depth],
+              terminal->title.window_title,
+              terminal->title.window_title_stack[terminal->title.window_title_stack_depth],
               256);
-          terminal->title_dirty = true;
+          terminal->title.title_dirty = true;
         }
       }
       if (n2 == 0 || n2 == 1) {
-        if (terminal->icon_name_stack_depth > 0) {
-          terminal->icon_name_stack_depth--;
-          memcpy(terminal->icon_name,
-                 terminal->icon_name_stack[terminal->icon_name_stack_depth],
+        if (terminal->title.icon_name_stack_depth > 0) {
+          terminal->title.icon_name_stack_depth--;
+          memcpy(terminal->title.icon_name,
+                 terminal->title.icon_name_stack[terminal->title.icon_name_stack_depth],
                  256);
-          terminal->title_dirty = true;
+          terminal->title.title_dirty = true;
         }
       }
     }
@@ -432,7 +432,7 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
     terminal_respond(terminal, buf, len);
   } else if (final == 'q') {
     if (token.length >= 3 && token.value[token.length - 2] == ' ')
-      terminal->cursor_shape = csi_param(token, 0);
+      terminal->modes.cursor_shape = csi_param(token, 0);
   } else {
     modify_cursor(&cursor, token);
   }
@@ -600,17 +600,17 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
       tlen = 0;
 
     if (cmd == 0 || cmd == 2) {
-      if (tlen >= (int)sizeof(terminal->window_title))
-        tlen = sizeof(terminal->window_title) - 1;
-      memcpy(terminal->window_title, &token.value[text_start], tlen);
-      terminal->window_title[tlen] = '\0';
-      terminal->title_dirty = true;
+      if (tlen >= (int)sizeof(terminal->title.window_title))
+        tlen = sizeof(terminal->title.window_title) - 1;
+      memcpy(terminal->title.window_title, &token.value[text_start], tlen);
+      terminal->title.window_title[tlen] = '\0';
+      terminal->title.title_dirty = true;
     }
     if (cmd == 0 || cmd == 1) {
-      if (tlen >= (int)sizeof(terminal->icon_name))
-        tlen = sizeof(terminal->icon_name) - 1;
-      memcpy(terminal->icon_name, &token.value[text_start], tlen);
-      terminal->icon_name[tlen] = '\0';
+      if (tlen >= (int)sizeof(terminal->title.icon_name))
+        tlen = sizeof(terminal->title.icon_name) - 1;
+      memcpy(terminal->title.icon_name, &token.value[text_start], tlen);
+      terminal->title.icon_name[tlen] = '\0';
     }
   } else if (cmd == 10 || cmd == 11) {
     const char *val = &token.value[i];
@@ -624,7 +624,7 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
     int tlen = text_end - text_start + 1;
 
     if (tlen >= 1 && val[0] == '?') {
-      unsigned long rgb = (cmd == 10) ? terminal->osc_fg : terminal->osc_bg;
+      unsigned long rgb = (cmd == 10) ? terminal->osc.osc_fg : terminal->osc.osc_bg;
       unsigned int r = (rgb >> 16) & 0xff;
       unsigned int g = (rgb >> 8) & 0xff;
       unsigned int b = rgb & 0xff;
@@ -637,11 +637,11 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
       unsigned long rgb;
       if (parse_color(val, tlen, &rgb)) {
         if (cmd == 10) {
-          terminal->osc_fg = rgb;
-          terminal->fg_dirty = true;
+          terminal->osc.osc_fg = rgb;
+          terminal->osc.fg_dirty = true;
         } else {
-          terminal->osc_bg = rgb;
-          terminal->bg_dirty = true;
+          terminal->osc.osc_bg = rgb;
+          terminal->osc.bg_dirty = true;
         }
       }
     }
@@ -667,10 +667,10 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
     char *decoded = NULL;
     int decoded_len = base64_decode(data, data_len, &decoded);
     if (decoded_len >= 0) {
-      free(terminal->osc52_text);
-      terminal->osc52_text = decoded;
-      terminal->osc52_len = decoded_len;
-      terminal->osc52_dirty = true;
+      free(terminal->osc.osc52_text);
+      terminal->osc.osc52_text = decoded;
+      terminal->osc.osc52_len = decoded_len;
+      terminal->osc.osc52_dirty = true;
     }
   } else if (cmd == 8) {
     // OSC 8 ; params ; uri BEL/ST hyperlinks
@@ -687,24 +687,24 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
              uri[uri_len - 1] == '\\')
       uri_len -= 2;
     Term_Screen *as =
-        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+        terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
     if (uri_len == 0) {
       as->cursor.attr.uri_idx = 0;
     } else {
-      for (int k = 0; k < terminal->uri_count; k++) {
-        if ((int)strlen(terminal->uri_table[k]) == uri_len &&
-            memcmp(terminal->uri_table[k], uri, uri_len) == 0) {
+      for (int k = 0; k < terminal->uri.uri_count; k++) {
+        if ((int)strlen(terminal->uri.uri_table[k]) == uri_len &&
+            memcmp(terminal->uri.uri_table[k], uri, uri_len) == 0) {
           as->cursor.attr.uri_idx = (uint16_t)(k + 1);
           return;
         }
       }
-      if (terminal->uri_count < 1023) {
+      if (terminal->uri.uri_count < 1023) {
         char *s = malloc(uri_len + 1);
         if (s) {
           memcpy(s, uri, uri_len);
           s[uri_len] = '\0';
-          terminal->uri_table[terminal->uri_count++] = s;
-          as->cursor.attr.uri_idx = (uint16_t)terminal->uri_count;
+          terminal->uri.uri_table[terminal->uri.uri_count++] = s;
+          as->cursor.attr.uri_idx = (uint16_t)terminal->uri.uri_count;
         }
       }
     }
@@ -716,18 +716,18 @@ static void handle_osc(Terminal *terminal, Term_Token token) {
       return;
     char zone = token.value[i];
     if (zone == 'A') {
-      Term_Screen *scr = terminal->using_alt_screen ? &terminal->alt_screen
-                                                    : &terminal->screen;
+      Term_Screen *scr = terminal->screens.using_alt_screen ? &terminal->screens.alt_screen
+                                                    : &terminal->screens.screen;
       int mark = scr->scrollback.count + scr->cursor.y;
-      int idx = (terminal->shell_mark_head + terminal->shell_mark_count) %
+      int idx = (terminal->marks.shell_mark_head + terminal->marks.shell_mark_count) %
                 SHELL_MARK_MAX;
-      if (terminal->shell_mark_count < SHELL_MARK_MAX) {
-        terminal->shell_marks[idx] = mark;
-        terminal->shell_mark_count++;
+      if (terminal->marks.shell_mark_count < SHELL_MARK_MAX) {
+        terminal->marks.shell_marks[idx] = mark;
+        terminal->marks.shell_mark_count++;
       } else {
-        terminal->shell_marks[terminal->shell_mark_head] = mark;
-        terminal->shell_mark_head =
-            (terminal->shell_mark_head + 1) % SHELL_MARK_MAX;
+        terminal->marks.shell_marks[terminal->marks.shell_mark_head] = mark;
+        terminal->marks.shell_mark_head =
+            (terminal->marks.shell_mark_head + 1) % SHELL_MARK_MAX;
       }
     }
   } else {
@@ -782,88 +782,88 @@ static void handle_erase(Term_Screen *screen, Term_TokenType type, int width,
 }
 
 void free_terminal(Terminal *terminal) {
-  free_screen(&terminal->screen, terminal->height);
-  free_screen(&terminal->alt_screen, terminal->height);
-  free(terminal->osc52_text);
-  for (int i = 0; i < terminal->uri_count; i++)
-    free(terminal->uri_table[i]);
+  free_screen(&terminal->screens.screen, terminal->dims.height);
+  free_screen(&terminal->screens.alt_screen, terminal->dims.height);
+  free(terminal->osc.osc52_text);
+  for (int i = 0; i < terminal->uri.uri_count; i++)
+    free(terminal->uri.uri_table[i]);
 }
 
 void init_terminal(Terminal *terminal, int width, int height,
                    int scrollback_lines) {
-  terminal->width = width;
-  terminal->height = height;
-  terminal->using_alt_screen = false;
-  terminal->window_title[0] = '\0';
-  terminal->icon_name[0] = '\0';
-  terminal->title_dirty = false;
-  terminal->partial_len = 0;
-  terminal->bracketed_paste = false;
-  terminal->mouse_mode = 0;
-  terminal->mouse_sgr = false;
-  terminal->osc_fg = 0xffffff;
-  terminal->fg_dirty = false;
-  terminal->osc_bg = 0;
-  terminal->bg_dirty = false;
-  terminal->default_fg_rgb = 0xffffff;
-  terminal->cursor_shape = 0;
-  terminal->bell_pending = false;
-  terminal->osc52_text = NULL;
-  terminal->osc52_len = 0;
-  terminal->osc52_dirty = false;
-  terminal->response_len = 0;
-  terminal->window_title_stack_depth = 0;
-  terminal->icon_name_stack_depth = 0;
-  terminal->uri_count = 0;
-  terminal->shell_mark_count = 0;
-  terminal->shell_mark_head = 0;
-  init_screen(&terminal->screen, width, height, scrollback_lines);
-  init_screen(&terminal->alt_screen, width, height, scrollback_lines);
+  terminal->dims.width = width;
+  terminal->dims.height = height;
+  terminal->screens.using_alt_screen = false;
+  terminal->title.window_title[0] = '\0';
+  terminal->title.icon_name[0] = '\0';
+  terminal->title.title_dirty = false;
+  terminal->parser.partial_len = 0;
+  terminal->modes.bracketed_paste = false;
+  terminal->modes.mouse_mode = 0;
+  terminal->modes.mouse_sgr = false;
+  terminal->osc.osc_fg = 0xffffff;
+  terminal->osc.fg_dirty = false;
+  terminal->osc.osc_bg = 0;
+  terminal->osc.bg_dirty = false;
+  terminal->osc.default_fg_rgb = 0xffffff;
+  terminal->modes.cursor_shape = 0;
+  terminal->modes.bell_pending = false;
+  terminal->osc.osc52_text = NULL;
+  terminal->osc.osc52_len = 0;
+  terminal->osc.osc52_dirty = false;
+  terminal->response.response_len = 0;
+  terminal->title.window_title_stack_depth = 0;
+  terminal->title.icon_name_stack_depth = 0;
+  terminal->uri.uri_count = 0;
+  terminal->marks.shell_mark_count = 0;
+  terminal->marks.shell_mark_head = 0;
+  init_screen(&terminal->screens.screen, width, height, scrollback_lines);
+  init_screen(&terminal->screens.alt_screen, width, height, scrollback_lines);
 }
 
 void reset_terminal(Terminal *terminal) {
-  reset_screen(&terminal->screen, terminal->width, terminal->height);
-  reset_screen(&terminal->alt_screen, terminal->width, terminal->height);
-  terminal->using_alt_screen = false;
-  terminal->window_title[0] = '\0';
-  terminal->icon_name[0] = '\0';
-  terminal->title_dirty = false;
-  terminal->partial_len = 0;
-  terminal->bracketed_paste = false;
-  terminal->mouse_mode = 0;
-  terminal->mouse_sgr = false;
-  terminal->osc_fg = 0xffffff;
-  terminal->fg_dirty = false;
-  terminal->osc_bg = 0;
-  terminal->bg_dirty = false;
-  terminal->response_len = 0;
-  terminal->window_title_stack_depth = 0;
-  terminal->icon_name_stack_depth = 0;
-  for (int i = 0; i < terminal->uri_count; i++) {
-    free(terminal->uri_table[i]);
-    terminal->uri_table[i] = NULL;
+  reset_screen(&terminal->screens.screen, terminal->dims.width, terminal->dims.height);
+  reset_screen(&terminal->screens.alt_screen, terminal->dims.width, terminal->dims.height);
+  terminal->screens.using_alt_screen = false;
+  terminal->title.window_title[0] = '\0';
+  terminal->title.icon_name[0] = '\0';
+  terminal->title.title_dirty = false;
+  terminal->parser.partial_len = 0;
+  terminal->modes.bracketed_paste = false;
+  terminal->modes.mouse_mode = 0;
+  terminal->modes.mouse_sgr = false;
+  terminal->osc.osc_fg = 0xffffff;
+  terminal->osc.fg_dirty = false;
+  terminal->osc.osc_bg = 0;
+  terminal->osc.bg_dirty = false;
+  terminal->response.response_len = 0;
+  terminal->title.window_title_stack_depth = 0;
+  terminal->title.icon_name_stack_depth = 0;
+  for (int i = 0; i < terminal->uri.uri_count; i++) {
+    free(terminal->uri.uri_table[i]);
+    terminal->uri.uri_table[i] = NULL;
   }
-  terminal->uri_count = 0;
-  terminal->shell_mark_count = 0;
-  terminal->shell_mark_head = 0;
+  terminal->uri.uri_count = 0;
+  terminal->marks.shell_mark_count = 0;
+  terminal->marks.shell_mark_head = 0;
 }
 
 void resize_terminal(Terminal *terminal, int new_width, int new_height) {
   if (new_width <= 0 || new_height <= 0)
     return;
-  if (terminal->width == new_width && terminal->height == new_height)
+  if (terminal->dims.width == new_width && terminal->dims.height == new_height)
     return;
 
-  int old_width = terminal->width;
-  int old_height = terminal->height;
+  int old_width = terminal->dims.width;
+  int old_height = terminal->dims.height;
 
-  resize_screen(&terminal->screen, old_width, old_height, new_width,
+  resize_screen(&terminal->screens.screen, old_width, old_height, new_width,
                 new_height);
-  resize_screen(&terminal->alt_screen, old_width, old_height, new_width,
+  resize_screen(&terminal->screens.alt_screen, old_width, old_height, new_width,
                 new_height);
 
-  terminal->width = new_width;
-  terminal->height = new_height;
+  terminal->dims.width = new_width;
+  terminal->dims.height = new_height;
 }
 
 static int incomplete_utf8_len(const char *buf, int len) {
@@ -907,15 +907,15 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   char *combined = NULL;
   int combined_len = length;
 
-  if (terminal->partial_len > 0) {
-    combined_len = terminal->partial_len + length;
+  if (terminal->parser.partial_len > 0) {
+    combined_len = terminal->parser.partial_len + length;
     combined = malloc(combined_len);
     if (!combined)
       return;
-    memcpy(combined, terminal->partial_buf, terminal->partial_len);
-    memcpy(combined + terminal->partial_len, text, length);
+    memcpy(combined, terminal->parser.partial_buf, terminal->parser.partial_len);
+    memcpy(combined + terminal->parser.partial_len, text, length);
     text = combined;
-    terminal->partial_len = 0;
+    terminal->parser.partial_len = 0;
   }
 
   int tail = incomplete_escape_tail(text, combined_len);
@@ -923,29 +923,29 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
     tail = incomplete_utf8_len(text, combined_len);
 
   if (tail >= combined_len) {
-    int save = tail < (int)sizeof(terminal->partial_buf)
+    int save = tail < (int)sizeof(terminal->parser.partial_buf)
                    ? tail
-                   : (int)sizeof(terminal->partial_buf) - 1;
-    memcpy(terminal->partial_buf, text, save);
-    terminal->partial_len = save;
+                   : (int)sizeof(terminal->parser.partial_buf) - 1;
+    memcpy(terminal->parser.partial_buf, text, save);
+    terminal->parser.partial_len = save;
     free(combined);
     return;
   }
   if (tail > 0) {
-    int save = tail < (int)sizeof(terminal->partial_buf)
+    int save = tail < (int)sizeof(terminal->parser.partial_buf)
                    ? tail
-                   : (int)sizeof(terminal->partial_buf) - 1;
-    memcpy(terminal->partial_buf, text + combined_len - tail, save);
-    terminal->partial_len = save;
+                   : (int)sizeof(terminal->parser.partial_buf) - 1;
+    memcpy(terminal->parser.partial_buf, text + combined_len - tail, save);
+    terminal->parser.partial_len = save;
     combined_len -= tail;
   }
 
   Term_Tokens *tokens = tokenize(text, combined_len);
-  int width = terminal->width;
-  int height = terminal->height;
+  int width = terminal->dims.width;
+  int height = terminal->dims.height;
 
   Term_Screen *active =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
   active->scroll_offset = 0;
 
 #ifdef DEBUG
@@ -956,7 +956,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
   for (int i = 0; i < tokens->count; i++) {
     Term_Token token = tokens->tokens[i];
     Term_Screen *screen =
-        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+        terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
     Term_Cursor *cursor = &screen->cursor;
 
     switch (token.type) {
@@ -1020,7 +1020,7 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
       }
       break;
     case TOKEN_BEL:
-      terminal->bell_pending = true;
+      terminal->modes.bell_pending = true;
       break;
     case TOKEN_OSC:
       handle_osc(terminal, token);

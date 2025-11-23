@@ -17,7 +17,7 @@ static void send_mouse_event(GuiContext *gui, Terminal *terminal, int btn,
                              int x, int y, bool release) {
   char buf[32];
   int len;
-  if (terminal->mouse_sgr) {
+  if (terminal->modes.mouse_sgr) {
     len = snprintf(buf, sizeof(buf), "\x1b[<%d;%d;%d%c", btn, x + 1, y + 1,
                    release ? 'm' : 'M');
   } else {
@@ -94,7 +94,7 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
   int buffer_len = XLookupString(ev, buffer, sizeof(buffer), &keysym, NULL);
 
   Term_Screen *scr =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
   int max_scroll = scr->scrollback.count;
 
   // Toggle search with Ctrl+Shift+F
@@ -152,12 +152,12 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
   }
 
   if (keysym == XK_Prior && (ev->state & ShiftMask)) {
-    scr->scroll_offset += terminal->height;
+    scr->scroll_offset += terminal->dims.height;
     if (scr->scroll_offset > max_scroll)
       scr->scroll_offset = max_scroll;
     draw_terminal(gui, terminal);
   } else if (keysym == XK_Next && (ev->state & ShiftMask)) {
-    scr->scroll_offset -= terminal->height;
+    scr->scroll_offset -= terminal->dims.height;
     if (scr->scroll_offset < 0)
       scr->scroll_offset = 0;
     draw_terminal(gui, terminal);
@@ -183,10 +183,10 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     int cur_top = scr->scrollback.count - scr->scroll_offset;
     int oldest = scr->scrollback.count - scr->scrollback.capacity;
     int best = -1;
-    for (int m = terminal->shell_mark_count - 1; m >= 0; m--) {
+    for (int m = terminal->marks.shell_mark_count - 1; m >= 0; m--) {
       int mark =
           terminal
-              ->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+              ->marks.shell_marks[(terminal->marks.shell_mark_head + m) % SHELL_MARK_MAX];
       if (mark < oldest)
         continue;
       if (mark < cur_top) {
@@ -205,10 +205,10 @@ static void on_key_press(GuiContext *gui, Terminal *terminal, XKeyEvent *ev) {
     int cur_top = scr->scrollback.count - scr->scroll_offset;
     int oldest = scr->scrollback.count - scr->scrollback.capacity;
     int best = -1;
-    for (int m = 0; m < terminal->shell_mark_count; m++) {
+    for (int m = 0; m < terminal->marks.shell_mark_count; m++) {
       int mark =
           terminal
-              ->shell_marks[(terminal->shell_mark_head + m) % SHELL_MARK_MAX];
+              ->marks.shell_marks[(terminal->marks.shell_mark_head + m) % SHELL_MARK_MAX];
       if (mark < oldest)
         continue;
       if (mark > cur_top) {
@@ -285,7 +285,7 @@ static Term_Cell *cell_at(Term_Screen *scr, Terminal *terminal, int abs_row,
     return &scr->scrollback.lines[sb_idx][col];
   }
   int row = abs_row - scr->scrollback.count;
-  if (row >= terminal->height || col >= terminal->width)
+  if (row >= terminal->dims.height || col >= terminal->dims.width)
     return NULL;
   return &scr->lines[row].cells[col];
 }
@@ -304,7 +304,7 @@ static void select_word(GuiContext *gui, Terminal *terminal, Term_Screen *scr,
       (abs_row < scr->scrollback.count)
           ? scr->scrollback.widths[(scr->scrollback.head + abs_row) %
                                    scr->scrollback.capacity]
-          : terminal->width;
+          : terminal->dims.width;
 
   int start = col;
   int end = col;
@@ -329,25 +329,25 @@ static void select_word(GuiContext *gui, Terminal *terminal, Term_Screen *scr,
 static void on_button_press(GuiContext *gui, Terminal *terminal,
                             XButtonEvent *ev) {
   Term_Screen *scr =
-      terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+      terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
   int max_scroll = scr->scrollback.count;
   int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
   int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
   if (cell_x < 0)
     cell_x = 0;
-  if (cell_x >= terminal->width)
-    cell_x = terminal->width - 1;
+  if (cell_x >= terminal->dims.width)
+    cell_x = terminal->dims.width - 1;
   if (cell_y < 0)
     cell_y = 0;
-  if (cell_y >= terminal->height)
-    cell_y = terminal->height - 1;
+  if (cell_y >= terminal->dims.height)
+    cell_y = terminal->dims.height - 1;
   bool shift = (ev->state & ShiftMask) != 0;
 
   if (ev->button == Button1 && (ev->state & ControlMask)) {
     int abs_row = scr->scrollback.count - scr->scroll_offset + cell_y;
     Term_Cell *lc = cell_at(scr, terminal, abs_row, cell_x);
     if (lc && lc->attr.uri_idx > 0) {
-      const char *uri = terminal->uri_table[lc->attr.uri_idx - 1];
+      const char *uri = terminal->uri.uri_table[lc->attr.uri_idx - 1];
       pid_t pid = fork();
       if (pid == 0) {
         setsid();
@@ -358,7 +358,7 @@ static void on_button_press(GuiContext *gui, Terminal *terminal,
     }
   }
 
-  if (terminal->mouse_mode >= 1 && !shift) {
+  if (terminal->modes.mouse_mode >= 1 && !shift) {
     int btn = -1;
     switch (ev->button) {
     case Button1:
@@ -435,17 +435,17 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
                               XButtonEvent *ev) {
   bool shift = (ev->state & ShiftMask) != 0;
 
-  if (terminal->mouse_mode >= 1 && !shift) {
+  if (terminal->modes.mouse_mode >= 1 && !shift) {
     int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
     int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
     if (cell_x < 0)
       cell_x = 0;
-    if (cell_x >= terminal->width)
-      cell_x = terminal->width - 1;
+    if (cell_x >= terminal->dims.width)
+      cell_x = terminal->dims.width - 1;
     if (cell_y < 0)
       cell_y = 0;
-    if (cell_y >= terminal->height)
-      cell_y = terminal->height - 1;
+    if (cell_y >= terminal->dims.height)
+      cell_y = terminal->dims.height - 1;
 
     int btn = -1;
     switch (ev->button) {
@@ -475,17 +475,17 @@ static void on_button_release(GuiContext *gui, Terminal *terminal,
 
   if (gui->selection.selecting) {
     Term_Screen *scr =
-        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+        terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
     int cell_x = (ev->x - gui->surface.margin) / gui->fonts.char_width;
     int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
     if (cell_x < 0)
       cell_x = 0;
-    if (cell_x >= terminal->width)
-      cell_x = terminal->width - 1;
+    if (cell_x >= terminal->dims.width)
+      cell_x = terminal->dims.width - 1;
     if (cell_y < 0)
       cell_y = 0;
-    if (cell_y >= terminal->height)
-      cell_y = terminal->height - 1;
+    if (cell_y >= terminal->dims.height)
+      cell_y = terminal->dims.height - 1;
     int cur_row = scr->scrollback.count - scr->scroll_offset + cell_y;
     gui->selection.sel_cur_x = cell_x;
     gui->selection.sel_cur_y = cur_row;
@@ -505,21 +505,21 @@ static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
   int cell_y = (ev->y - gui->surface.margin) / gui->fonts.char_height;
   if (cell_x < 0)
     cell_x = 0;
-  if (cell_x >= terminal->width)
-    cell_x = terminal->width - 1;
+  if (cell_x >= terminal->dims.width)
+    cell_x = terminal->dims.width - 1;
   if (cell_y < 0)
     cell_y = 0;
-  if (cell_y >= terminal->height)
-    cell_y = terminal->height - 1;
+  if (cell_y >= terminal->dims.height)
+    cell_y = terminal->dims.height - 1;
   bool shift = (ev->state & ShiftMask) != 0;
 
-  if (terminal->mouse_mode >= 1 && !shift) {
+  if (terminal->modes.mouse_mode >= 1 && !shift) {
     bool btn1 = (ev->state & Button1Mask) != 0;
     bool btn2 = (ev->state & Button2Mask) != 0;
     bool btn3 = (ev->state & Button3Mask) != 0;
     bool any_btn = btn1 || btn2 || btn3;
     bool should_report =
-        (terminal->mouse_mode >= 3) || (terminal->mouse_mode >= 2 && any_btn);
+        (terminal->modes.mouse_mode >= 3) || (terminal->modes.mouse_mode >= 2 && any_btn);
     if (should_report) {
       int btn;
       if (btn1)
@@ -542,7 +542,7 @@ static void on_motion(GuiContext *gui, Terminal *terminal, XMotionEvent *ev) {
 
   if (gui->selection.selecting) {
     Term_Screen *scr =
-        terminal->using_alt_screen ? &terminal->alt_screen : &terminal->screen;
+        terminal->screens.using_alt_screen ? &terminal->screens.alt_screen : &terminal->screens.screen;
     gui->selection.sel_cur_x = cell_x;
     gui->selection.sel_cur_y = scr->scrollback.count - scr->scroll_offset + cell_y;
     gui->selection.has_selection = true;
@@ -583,10 +583,10 @@ static void on_selection_notify(GuiContext *gui, Terminal *terminal,
                      True, AnyPropertyType, &actual_type, &actual_format,
                      &nitems, &bytes_after, &data);
   if (data) {
-    if (terminal->bracketed_paste)
+    if (terminal->modes.bracketed_paste)
       write(gui->process.pipe_fd, "\x1b[200~", 6);
     write(gui->process.pipe_fd, data, nitems);
-    if (terminal->bracketed_paste)
+    if (terminal->modes.bracketed_paste)
       write(gui->process.pipe_fd, "\x1b[201~", 6);
     XFree(data);
   }

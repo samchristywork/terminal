@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
   if (term_rows < 1)
     term_rows = 1;
   init_terminal(&terminal, term_cols, term_rows, args.scrollback);
-  terminal.default_fg_rgb = (args.fg != -1) ? (unsigned long)args.fg : 0xffffff;
+  terminal.osc.default_fg_rgb = (args.fg != -1) ? (unsigned long)args.fg : 0xffffff;
   init_shell(&gui, term_cols, term_rows);
 
   XMapWindow(gui.x11.display, gui.x11.window);
@@ -444,7 +444,7 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &now);
     long elapsed_ms = (now.tv_sec - gui.cursor.last_blink.tv_sec) * 1000 +
                       (now.tv_nsec - gui.cursor.last_blink.tv_nsec) / 1000000;
-    bool steady = terminal.cursor_shape % 2 == 0 && terminal.cursor_shape != 0;
+    bool steady = terminal.modes.cursor_shape % 2 == 0 && terminal.modes.cursor_shape != 0;
     if (elapsed_ms >= 500) {
       gui.cursor.cursor_visible = steady ? true : !gui.cursor.cursor_visible;
       gui.cursor.last_blink = now;
@@ -476,21 +476,21 @@ int main(int argc, char *argv[]) {
 
     if (FD_ISSET(gui.process.pipe_fd, &read_fds)) {
       read_shell_output(&gui, &terminal);
-      if (terminal.screen.scrolled || terminal.alt_screen.scrolled) {
+      if (terminal.screens.screen.scrolled || terminal.screens.alt_screen.scrolled) {
         gui.selection.has_selection = false;
-        terminal.screen.scrolled = false;
-        terminal.alt_screen.scrolled = false;
+        terminal.screens.screen.scrolled = false;
+        terminal.screens.alt_screen.scrolled = false;
       }
-      if (terminal.response_len > 0) {
-        write(gui.process.pipe_fd, terminal.response_buf, terminal.response_len);
-        terminal.response_len = 0;
+      if (terminal.response.response_len > 0) {
+        write(gui.process.pipe_fd, terminal.response.response_buf, terminal.response.response_len);
+        terminal.response.response_len = 0;
       }
-      if (terminal.title_dirty) {
-        XStoreName(gui.x11.display, gui.x11.window, terminal.window_title);
-        terminal.title_dirty = false;
+      if (terminal.title.title_dirty) {
+        XStoreName(gui.x11.display, gui.x11.window, terminal.title.window_title);
+        terminal.title.title_dirty = false;
       }
-      if (terminal.fg_dirty) {
-        unsigned long fg_val = terminal.osc_fg;
+      if (terminal.osc.fg_dirty) {
+        unsigned long fg_val = terminal.osc.osc_fg;
         Colormap colormap = gui.x11.colormap;
         Visual *visual = gui.x11.visual;
         XColor color;
@@ -509,10 +509,10 @@ int main(int argc, char *argv[]) {
         xrender_color.alpha = 0xffff;
         XftColorAllocValue(gui.x11.display, visual, colormap, &xrender_color,
                            &gui.color.xft_default_fg);
-        terminal.fg_dirty = false;
+        terminal.osc.fg_dirty = false;
       }
-      if (terminal.bg_dirty) {
-        unsigned long bg_val = terminal.osc_bg;
+      if (terminal.osc.bg_dirty) {
+        unsigned long bg_val = terminal.osc.osc_bg;
         Colormap colormap = gui.x11.colormap;
         Visual *visual = gui.x11.visual;
         XColor color;
@@ -531,20 +531,20 @@ int main(int argc, char *argv[]) {
         xrender_color.alpha = 0xffff;
         XftColorAllocValue(gui.x11.display, visual, colormap, &xrender_color,
                            &gui.color.xft_default_bg);
-        terminal.bg_dirty = false;
+        terminal.osc.bg_dirty = false;
       }
-      if (terminal.bell_pending) {
+      if (terminal.modes.bell_pending) {
         gui.bell.bell_flash = true;
         gui.bell.bell_start = now;
-        terminal.bell_pending = false;
+        terminal.modes.bell_pending = false;
       }
-      if (terminal.osc52_dirty) {
+      if (terminal.osc.osc52_dirty) {
         free(gui.selection.selection_text);
-        gui.selection.selection_text = terminal.osc52_text;
-        gui.selection.selection_len = terminal.osc52_len;
-        terminal.osc52_text = NULL;
-        terminal.osc52_len = 0;
-        terminal.osc52_dirty = false;
+        gui.selection.selection_text = terminal.osc.osc52_text;
+        gui.selection.selection_len = terminal.osc.osc52_len;
+        terminal.osc.osc52_text = NULL;
+        terminal.osc.osc52_len = 0;
+        terminal.osc.osc52_dirty = false;
         gui.selection.has_selection = true;
         XSetSelectionOwner(gui.x11.display, gui.selection.atom_clipboard, gui.x11.window,
                            CurrentTime);
