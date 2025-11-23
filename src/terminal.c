@@ -273,18 +273,22 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
     for (int j = bot; j >= cursor->y + rows; j--)
       memcpy(screen->lines[j].cells, screen->lines[j - rows].cells,
              width * sizeof(Term_Cell));
+    Term_Cell blank_l = {0};
+    blank_l.attr.bg = cursor->attr.bg;
     for (int j = cursor->y; j < cursor->y + rows; j++)
       for (int k = 0; k < width; k++)
-        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+        screen->lines[j].cells[k] = blank_l;
   } else if (final == 'M') {
     int bot = screen->scroll_bot;
     int rows = n < (bot - cursor->y + 1) ? n : (bot - cursor->y + 1);
     for (int j = cursor->y; j <= bot - rows; j++)
       memcpy(screen->lines[j].cells, screen->lines[j + rows].cells,
              width * sizeof(Term_Cell));
+    Term_Cell blank_m = {0};
+    blank_m.attr.bg = cursor->attr.bg;
     for (int j = bot - rows + 1; j <= bot; j++)
       for (int k = 0; k < width; k++)
-        memset(&screen->lines[j].cells[k], 0, sizeof(Term_Cell));
+        screen->lines[j].cells[k] = blank_m;
   } else if (final == 'r') {
     const char *p = token.value + 2;
     const char *end = token.value + token.length - 1;
@@ -1012,8 +1016,10 @@ void write_terminal(Terminal *terminal, const char *text, int length) {
         for (int j = screen->scroll_bot; j > screen->scroll_top; j--)
           memcpy(screen->lines[j].cells, screen->lines[j - 1].cells,
                  width * sizeof(Term_Cell));
-        memset(screen->lines[screen->scroll_top].cells, 0,
-               width * sizeof(Term_Cell));
+        Term_Cell blank = {0};
+        blank.attr.bg = cursor->attr.bg;
+        for (int k = 0; k < width; k++)
+          screen->lines[screen->scroll_top].cells[k] = blank;
       } else {
         if (cursor->y > 0)
           cursor->y--;
