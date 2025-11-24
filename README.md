@@ -39,11 +39,16 @@ artifact-free even during rapid screen updates.
 Usage: ./build/gui [OPTIONS]
 Options:
   --font-size SIZE      Set font size (default: 14)
+  --scrollback N        Scrollback buffer size (default: 1000)
   --font PATTERN        Fontconfig font pattern (e.g. 'Monospace')
   --fg RRGGBB           Default foreground color (hex, default: ffffff)
   --bg RRGGBB           Default background color (hex, default: 000000)
   --color N RRGGBB      Override palette color N (0-15) with hex value
   --log-file FILE       Write logs to FILE instead of stdout
+  --margin N            Set window margin in pixels (default: 10)
+  --alpha N             Window opacity 0-255 (default: 255, requires compositor)
+  --title TEXT          Initial window title
+  --size COLSxROWS      Initial window size in character cells (e.g. 220x50)
   --help                Show this help message
 ```
 
