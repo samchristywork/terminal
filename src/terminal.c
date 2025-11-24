@@ -289,6 +289,24 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
     for (int j = bot - rows + 1; j <= bot; j++)
       for (int k = 0; k < width; k++)
         screen->lines[j].cells[k] = blank_m;
+  } else if (final == 'S') {
+    int top = screen->scroll_top;
+    int bot = screen->scroll_bot;
+    int scroll_n = n < (bot - top + 1) ? n : (bot - top + 1);
+    for (int j = 0; j < scroll_n; j++)
+      scroll_screen(screen, width, height);
+  } else if (final == 'T') {
+    int top = screen->scroll_top;
+    int bot = screen->scroll_bot;
+    int scroll_n = n < (bot - top + 1) ? n : (bot - top + 1);
+    for (int j = bot; j >= top + scroll_n; j--)
+      memcpy(screen->lines[j].cells, screen->lines[j - scroll_n].cells,
+             width * sizeof(Term_Cell));
+    Term_Cell blank_t = {0};
+    blank_t.attr.bg = cursor->attr.bg;
+    for (int j = top; j < top + scroll_n; j++)
+      for (int k = 0; k < width; k++)
+        screen->lines[j].cells[k] = blank_t;
   } else if (final == 'r') {
     const char *p = token.value + 2;
     const char *end = token.value + token.length - 1;
