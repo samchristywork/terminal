@@ -62,6 +62,7 @@ int init_gui(GuiContext *gui, Args *args) {
 
   init_colors(gui, args);
 
+  gui->surface.margin = args->margin;
   gui->surface.window_width = 800;
   gui->surface.window_height = 600;
   XSetWindowAttributes xwa;
@@ -211,6 +212,14 @@ int init_gui(GuiContext *gui, Args *args) {
   gui->fonts.char_height = gui->fonts.font->ascent + gui->fonts.font->descent;
   gui->fonts.char_ascent = gui->fonts.font->ascent;
 
+  if (args->cols > 0)
+    gui->surface.window_width = args->cols * gui->fonts.char_width + 2 * gui->surface.margin;
+  if (args->rows > 0)
+    gui->surface.window_height = args->rows * gui->fonts.char_height + 2 * gui->surface.margin;
+  if (args->cols > 0 || args->rows > 0)
+    XResizeWindow(gui->x11.display, gui->x11.window, gui->surface.window_width,
+                  gui->surface.window_height);
+
   gui->surface.backbuffer = XCreatePixmap(gui->x11.display, gui->x11.window, gui->surface.window_width,
                                   gui->surface.window_height, depth);
 
@@ -236,7 +245,6 @@ int init_gui(GuiContext *gui, Args *args) {
   memset(gui->color.xft_color_cached, 0, sizeof(gui->color.xft_color_cached));
   memset(gui->color.rgb_cache_valid, 0, sizeof(gui->color.rgb_cache_valid));
   gui->color.rgb_cache_next = 0;
-  gui->surface.margin = args->margin;
 
   return 0;
 }

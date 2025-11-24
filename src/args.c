@@ -75,6 +75,12 @@ static void load_config(Args *args) {
       int v = atoi(val);
       if (v >= 0 && v <= 255)
         args->alpha = v;
+    } else if (strcmp(key, "size") == 0) {
+      int c = 0, r = 0;
+      if (sscanf(val, "%dx%d", &c, &r) == 2 && c > 0 && r > 0) {
+        args->cols = c;
+        args->rows = r;
+      }
     }
   }
   fclose(f);
@@ -102,6 +108,8 @@ void print_usage(const char *program_name) {
       "  --margin N            Set window margin in pixels (default: 10)\n");
   fprintf(stderr, "  --alpha N             Window opacity 0-255 (default: 255, "
                   "requires compositor)\n");
+  fprintf(stderr,
+          "  --size COLSxROWS      Initial window size in character cells (e.g. 220x50)\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
 
@@ -114,6 +122,8 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->bg = -1;
   args->margin = 10;
   args->alpha = 255;
+  args->cols = 0;
+  args->rows = 0;
   for (int i = 0; i < 16; i++)
     args->palette[i] = -1;
 
@@ -206,6 +216,19 @@ void parse_args(int argc, char *argv[], Args *args) {
         fprintf(stderr, "Error: alpha must be 0-255\n");
         exit(1);
       }
+    } else if (strcmp(argv[i], "--size") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --size requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      int c = 0, r = 0;
+      if (sscanf(argv[++i], "%dx%d", &c, &r) != 2 || c <= 0 || r <= 0) {
+        fprintf(stderr, "Error: --size requires COLSxROWS (e.g. 220x50)\n");
+        exit(1);
+      }
+      args->cols = c;
+      args->rows = r;
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage(argv[0]);
       exit(0);
