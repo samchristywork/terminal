@@ -90,21 +90,6 @@ int init_gui(GuiContext *gui, Args *args) {
   char regular_base[256] = "";
   char bold_base[256] = "";
   char italic_base[256] = "";
-  char exe_path[512];
-  char exe_dir[512];
-  ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-  if (len != -1) {
-    exe_path[len] = '\0';
-    char *slash = strrchr(exe_path, '/');
-    if (slash) {
-      *slash = '\0';
-      snprintf(exe_dir, sizeof(exe_dir), "%s", exe_path);
-    } else {
-      snprintf(exe_dir, sizeof(exe_dir), ".");
-    }
-  } else {
-    snprintf(exe_dir, sizeof(exe_dir), ".");
-  }
 
   if (args->font) {
     char *size_pos = strstr(args->font, ":size=");
@@ -125,68 +110,25 @@ int init_gui(GuiContext *gui, Args *args) {
       XCloseDisplay(gui->x11.display);
       return 1;
     }
-    gui->fonts.font_bold = gui->fonts.font;
   } else {
-    snprintf(font_pattern, sizeof(font_pattern),
-             "Iosevka Nerd Font Mono:size=%d", font_size);
+    snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d", font_size);
     gui->fonts.font = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
-    if (gui->fonts.font) {
-      snprintf(regular_base, sizeof(regular_base), "Iosevka Nerd Font Mono");
-    } else {
-      LOG_WARNING_MSG("Cannot load Iosevka font, trying FreeMono");
-      char repo_dir[512];
-      char *sep = strrchr(exe_dir, '/');
-      if (sep && sep != exe_dir) {
-        int rlen = (int)(sep - exe_dir);
-        memcpy(repo_dir, exe_dir, rlen);
-        repo_dir[rlen] = '\0';
-      } else {
-        snprintf(repo_dir, sizeof(repo_dir), "%s", exe_dir);
-      }
-      char bundled_font[1024];
-      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMono.otf",
-               repo_dir);
-      FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-      snprintf(bundled_font, sizeof(bundled_font), "%s/assets/FreeMonoBold.otf",
-               repo_dir);
-      FcConfigAppFontAddFile(NULL, (const FcChar8 *)bundled_font);
-      snprintf(font_pattern, sizeof(font_pattern), "FreeMono:size=%d",
-               font_size);
-      gui->fonts.font = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
-      if (gui->fonts.font)
-        snprintf(regular_base, sizeof(regular_base), "FreeMono");
-    }
-    if (!gui->fonts.font) {
-      LOG_WARNING_MSG("Cannot load FreeMono font, trying monospace fallback");
-      snprintf(font_pattern, sizeof(font_pattern), "monospace:size=%d",
-               font_size);
-      gui->fonts.font = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
-      if (gui->fonts.font)
-        snprintf(regular_base, sizeof(regular_base), "monospace");
-    }
     if (!gui->fonts.font) {
       fprintf(stderr, "Cannot load any suitable font\n");
       LOG_ERROR_MSG("Cannot load any suitable font");
       XCloseDisplay(gui->x11.display);
       return 1;
     }
-
-    snprintf(font_pattern, sizeof(font_pattern),
-             "Iosevka Nerd Font Mono:weight=bold:size=%d", font_size);
-    gui->fonts.font_bold = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
-    if (gui->fonts.font_bold) {
-      snprintf(bold_base, sizeof(bold_base),
-               "Iosevka Nerd Font Mono:weight=bold");
-    } else {
-      snprintf(font_pattern, sizeof(font_pattern),
-               "monospace:weight=bold:size=%d", font_size);
-      gui->fonts.font_bold = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
-      if (gui->fonts.font_bold)
-        snprintf(bold_base, sizeof(bold_base), "monospace:weight=bold");
-    }
-    if (!gui->fonts.font_bold)
-      gui->fonts.font_bold = gui->fonts.font;
+    snprintf(regular_base, sizeof(regular_base), "monospace");
   }
+
+  snprintf(font_pattern, sizeof(font_pattern), "%s:weight=bold:size=%d",
+           regular_base, font_size);
+  gui->fonts.font_bold = XftFontOpenName(gui->x11.display, gui->x11.screen, font_pattern);
+  if (gui->fonts.font_bold)
+    snprintf(bold_base, sizeof(bold_base), "%s:weight=bold", regular_base);
+  else
+    gui->fonts.font_bold = gui->fonts.font;
   if (regular_base[0]) {
     snprintf(font_pattern, sizeof(font_pattern), "%s:slant=italic:size=%d",
              regular_base, font_size);
