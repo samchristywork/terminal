@@ -81,6 +81,9 @@ static void load_config(Args *args) {
         args->cols = c;
         args->rows = r;
       }
+    } else if (strcmp(key, "title") == 0) {
+      free(args->title);
+      args->title = strdup(val);
     }
   }
   fclose(f);
@@ -109,6 +112,8 @@ void print_usage(const char *program_name) {
   fprintf(stderr, "  --alpha N             Window opacity 0-255 (default: 255, "
                   "requires compositor)\n");
   fprintf(stderr,
+          "  --title TEXT          Initial window title\n");
+  fprintf(stderr,
           "  --size COLSxROWS      Initial window size in character cells (e.g. 220x50)\n");
   fprintf(stderr, "  --help                Show this help message\n");
 }
@@ -124,6 +129,7 @@ void parse_args(int argc, char *argv[], Args *args) {
   args->alpha = 255;
   args->cols = 0;
   args->rows = 0;
+  args->title = NULL;
   for (int i = 0; i < 16; i++)
     args->palette[i] = -1;
 
@@ -216,6 +222,14 @@ void parse_args(int argc, char *argv[], Args *args) {
         fprintf(stderr, "Error: alpha must be 0-255\n");
         exit(1);
       }
+    } else if (strcmp(argv[i], "--title") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Error: --title requires an argument\n");
+        print_usage(argv[0]);
+        exit(1);
+      }
+      free(args->title);
+      args->title = argv[++i];
     } else if (strcmp(argv[i], "--size") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "Error: --size requires an argument\n");

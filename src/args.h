@@ -11,8 +11,9 @@ typedef struct {
   long palette[16]; // -1 = use built-in default for that slot
   int margin;
   int alpha; // 0-255, 255 = fully opaque
-  int cols;  // 0 = derive from window pixel size
-  int rows;  // 0 = derive from window pixel size
+  int cols;    // 0 = derive from window pixel size
+  int rows;    // 0 = derive from window pixel size
+  char *title; // NULL = leave blank until shell sets it
 } Args;
 
 void parse_args(int argc, char *argv[], Args *args);

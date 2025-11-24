@@ -79,7 +79,8 @@ int init_gui(GuiContext *gui, Args *args) {
                    ButtonReleaseMask | Button1MotionMask | Button2MotionMask |
                    Button3MotionMask | PointerMotionMask | StructureNotifyMask);
 
-  XStoreName(gui->x11.display, gui->x11.window, "Terminal GUI");
+  XStoreName(gui->x11.display, gui->x11.window,
+             args->title ? args->title : "Terminal GUI");
 
   gui->x11.gc = XCreateGC(gui->x11.display, gui->x11.window, 0, NULL);
   XSetForeground(gui->x11.display, gui->x11.gc, gui->color.white);
