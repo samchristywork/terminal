@@ -385,7 +385,9 @@ static void handle_csi(Terminal *terminal, Term_Screen *screen,
       terminal->screens.using_alt_screen = enable;
       if (!enable)
         terminal->screens.screen.cursor = terminal->screens.screen.saved_cursor;
-    } else if (starts_with(token.value, token.length, "\x1b[?25"))
+    } else if (starts_with(token.value, token.length, "\x1b[?12"))
+      terminal->modes.cursor_blink = enable;
+    else if (starts_with(token.value, token.length, "\x1b[?25"))
       screen->cursor_hidden = !enable;
     else if (starts_with(token.value, token.length, "\x1b[?2004"))
       terminal->modes.bracketed_paste = enable;
@@ -838,6 +840,7 @@ void init_terminal(Terminal *terminal, int width, int height,
   terminal->osc.bg_dirty = false;
   terminal->osc.default_fg_rgb = 0xffffff;
   terminal->modes.cursor_shape = 0;
+  terminal->modes.cursor_blink = true;
   terminal->modes.bell_pending = false;
   terminal->osc.osc52_text = NULL;
   terminal->osc.osc52_len = 0;
@@ -863,6 +866,7 @@ void reset_terminal(Terminal *terminal) {
   terminal->modes.bracketed_paste = false;
   terminal->modes.mouse_mode = 0;
   terminal->modes.mouse_sgr = false;
+  terminal->modes.cursor_blink = true;
   terminal->osc.osc_fg = 0xffffff;
   terminal->osc.fg_dirty = false;
   terminal->osc.osc_bg = 0;

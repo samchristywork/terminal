@@ -108,6 +108,7 @@ typedef struct {
   bool mouse_sgr; // SGR extended coordinates (1006)
   int cursor_shape; // DECSCUSR: 0/1=blinking block, 2=steady block, 3=blinking
                     // underline, 4=steady underline, 5=blinking bar, 6=steady bar
+  bool cursor_blink; // false when ?12l disables blinking independent of cursor_shape
   bool bell_pending;
 } Term_Modes;
 

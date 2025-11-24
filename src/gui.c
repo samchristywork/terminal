@@ -452,7 +452,8 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &now);
     long elapsed_ms = (now.tv_sec - gui.cursor.last_blink.tv_sec) * 1000 +
                       (now.tv_nsec - gui.cursor.last_blink.tv_nsec) / 1000000;
-    bool steady = terminal.modes.cursor_shape % 2 == 0 && terminal.modes.cursor_shape != 0;
+    bool shape_steady = terminal.modes.cursor_shape % 2 == 0 && terminal.modes.cursor_shape != 0;
+    bool steady = shape_steady || !terminal.modes.cursor_blink;
     if (elapsed_ms >= 500) {
       gui.cursor.cursor_visible = steady ? true : !gui.cursor.cursor_visible;
       gui.cursor.last_blink = now;
