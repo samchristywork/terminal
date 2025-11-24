@@ -148,6 +148,7 @@ void parse_args(int argc, char *argv[], Args *args) {
         print_usage(argv[0]);
         exit(1);
       }
+      free(args->font);
       args->font = argv[++i];
     } else if (strcmp(argv[i], "--fg") == 0) {
       if (i + 1 >= argc) {
@@ -181,6 +182,7 @@ void parse_args(int argc, char *argv[], Args *args) {
         print_usage(argv[0]);
         exit(1);
       }
+      free(args->log_file);
       args->log_file = argv[++i];
     } else if (strcmp(argv[i], "--margin") == 0) {
       if (i + 1 >= argc) {
