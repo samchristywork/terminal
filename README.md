@@ -22,14 +22,15 @@ artifact-free even during rapid screen updates.
 
 - VT100/VT220 and ANSI escape code support
 - 16-color, 256-color, and true-color (RGB) rendering via Xft
-- Scrollback buffer (1000 lines)
+- Scrollback buffer with configurable size
 - Alternate screen buffer support
 - Mouse reporting (click, button+motion, and any-motion modes with SGR extension)
 - Text selection and clipboard integration (PRIMARY and CLIPBOARD)
-- Blinking cursor
+- Blinking cursor with mode toggle support (CSI ?12h/l)
 - Bracketed paste mode
-- Bold text with a separate bold font
-- Configurable font, font size, foreground/background colors, and palette
+- Bold and italic text with separate font variants
+- Configurable via CLI flags and `~/.config/terminal/config`
+- Configurable font, font size, colors, palette, margin, opacity, title, and window size
 - Double-buffered rendering to eliminate flicker
 
 ## Usage
