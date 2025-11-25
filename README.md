@@ -31,7 +31,6 @@ artifact-free even during rapid screen updates.
 - Bold text with a separate bold font
 - Configurable font, font size, foreground/background colors, and palette
 - Double-buffered rendering to eliminate flicker
-- Bundled FreeMono font
 
 ## Usage
 
@@ -59,7 +58,6 @@ gcc
 libx11-dev
 libxft-dev
 libxrender-dev
-libfontconfig-dev
 make
 ```
 
