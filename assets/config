@@ -5,8 +5,17 @@
 # font = Monospace
 # font-size = 14
 
+# Initial window title
+# title = Terminal
+
+# Initial window size in character cells
+# size = 220x50
+
 # Window margin in pixels
 # margin = 10
+
+# Window opacity: 0 = fully transparent, 255 = fully opaque (requires compositor)
+# alpha = 255
 
 # Scrollback buffer size
 # scrollback = 1000
