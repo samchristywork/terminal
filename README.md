@@ -52,6 +52,12 @@ Options:
   --help                Show this help message
 ```
 
+## Configuration
+
+A config file can be placed at `~/.config/terminal/config`. A sample with all
+supported keys is provided in `assets/config`. CLI flags take precedence over
+config file values.
+
 ## Dependencies
 
 ```
